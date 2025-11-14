@@ -15,4 +15,9 @@ namespace cured
     {
         public static string login_user;
     }
+
+    public static class userid
+    {
+        public static int userID;
+    }
 }

@@ -9,8 +9,6 @@ namespace cured
 {
     public class DataBase
     {
-        string computerName = Environment.MachineName;
-
         SqlConnection con = new SqlConnection(@"Server=DESKTOP-O67QLR8\CURSED; Initial Catalog=cursed; Integrated Security=True;");
 
         public void openConnection()
