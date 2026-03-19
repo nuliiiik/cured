@@ -62,5 +62,15 @@ namespace cured
             }
             return dt;
         }
+
+        public object ExecuteScalar(string query)
+        {
+            using (SqlConnection con = new SqlConnection(connectionString))
+            {
+                con.Open();
+                SqlCommand cmd = new SqlCommand(query, con);
+                return cmd.ExecuteScalar();
+            }
+        }
     }
 }
