@@ -77,5 +77,29 @@ namespace cured
                 MessageBox.Show("Такого аккаунта не существует(", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
+
+        private void button1_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                // Вызываем событие клика нужной кнопки
+                button1.PerformClick();
+
+                // Подавляем стандартный звук "пиканья" Windows при нажатии Enter
+                e.SuppressKeyPress = true;
+            }
+        }
+
+        private void textBox2_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                // Вызываем событие клика нужной кнопки
+                button1.PerformClick();
+
+                // Подавляем стандартный звук "пиканья" Windows при нажатии Enter
+                e.SuppressKeyPress = true;
+            }
+        }
     }
 }

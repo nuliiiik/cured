@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(profile));
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabAcc = new System.Windows.Forms.TabPage();
             this.label11 = new System.Windows.Forms.Label();
@@ -468,6 +469,7 @@
             this.Controls.Add(this.tabControl1);
             this.Controls.Add(this.panel3);
             this.Controls.Add(this.panel4);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4);
             this.MaximizeBox = false;
             this.MinimizeBox = false;

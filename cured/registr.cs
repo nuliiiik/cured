@@ -93,9 +93,16 @@ namespace cured
             }
         }
 
-        private void panel1_Paint(object sender, PaintEventArgs e)
+        private void maskedTextBox1_KeyDown(object sender, KeyEventArgs e)
         {
+            if (e.KeyCode == Keys.Enter)
+            {
+                // Вызываем событие клика нужной кнопки
+                button1.PerformClick();
 
+                // Подавляем стандартный звук "пиканья" Windows при нажатии Enter
+                e.SuppressKeyPress = true;
+            }
         }
     }
 }

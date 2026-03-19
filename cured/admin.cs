@@ -29,13 +29,10 @@ namespace cured
         {
             this.Text = "Панель администратора";
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(45, 45, 48);
 
             lblTitle = new Label
             {
-                Text = "Управление базами данных",
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 16, FontStyle.Bold),
+                Text = "Панель администратора",
                 Location = new Point(20, 20),
                 AutoSize = true
             };
@@ -43,9 +40,7 @@ namespace cured
             cbTables = new ComboBox
             {
                 Location = new Point(20, 60),
-                Width = 200,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10)
+                Width = 200
             };
             cbTables.Items.AddRange(new string[] { "Users", "Motorcycles", "Parts", "Orders", "OrderItems", "Cart" });
             // Подписываемся на событие смены таблицы
@@ -58,7 +53,6 @@ namespace cured
             {
                 Location = new Point(20, 100),
                 Size = new Size(1040, 480),
-                BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
@@ -69,11 +63,7 @@ namespace cured
             {
                 Text = "Сохранить изменения",
                 Location = new Point(20, 600),
-                Size = new Size(180, 40),
-                BackColor = Color.SeaGreen,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+                Size = new Size(180, 40)
             };
             btnSave.Click += btnSave_Click; // Теперь метод существует
 
@@ -81,11 +71,7 @@ namespace cured
             {
                 Text = "Удалить выбранное",
                 Location = new Point(210, 600),
-                Size = new Size(180, 40),
-                BackColor = Color.IndianRed,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+                Size = new Size(180, 40)
             };
             btnDelete.Click += btnDelete_Click; // Теперь метод существует
 
@@ -94,10 +80,6 @@ namespace cured
                 Text = "Вернуться на главную",
                 Location = new Point(880, 600),
                 Size = new Size(180, 40),
-                BackColor = Color.Gray,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
             btnBack.Click += (s, e) => this.Close();
 
