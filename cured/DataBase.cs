@@ -1,38 +1,66 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Data;
 using System.Data.SqlClient;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace cured
 {
-    public class DataBase
+    class DataBase
     {
-        string computerName = Environment.MachineName;
+        // ВНИМАНИЕ: Проверьте строку подключения! Она должна быть такой же, как в ваших рабочих формах.
+        private string connectionString = @"Data Source=DESKTOP-O67QLR8\CURSED;Initial Catalog=CURSED;Integrated Security=True";
 
-        SqlConnection con = new SqlConnection(@"Server=DESKTOP-O67QLR8\CURSED; Initial Catalog=cursed; Integrated Security=True;");
+        SqlConnection con;
 
-        public void openConnection()
+        public DataBase()
         {
-            if (con.State == System.Data.ConnectionState.Closed)
-            {
-                con.Open();
-            }
+            con = new SqlConnection(connectionString);
         }
 
-        public void closeConnection()
-        {
-            if (con.State == System.Data.ConnectionState.Open)
-            {
-                con.Close();
-            }
-        }
-
+        // Метод для ваших старых форм
         public SqlConnection getConnection()
         {
             return con;
         }
 
+        public void openConnection()
+        {
+            if (con.State == ConnectionState.Closed) con.Open();
+        }
+
+        public void closeConnection()
+        {
+            if (con.State == ConnectionState.Open) con.Close();
+        }
+
+        // Новый метод для добавления в корзину
+        public void ExecuteNonQuery(string query)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand cmd = new SqlCommand(query, connection))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Выводим ошибку, чтобы понять, что не так с SQL или строкой подключения
+                throw new Exception("Ошибка БД: " + ex.Message);
+            }
+        }
+
+        public DataTable ExecuteQuery(string query)
+        {
+            DataTable dt = new DataTable();
+            using (SqlDataAdapter da = new SqlDataAdapter(query, connectionString))
+            {
+                da.Fill(dt);
+            }
+            return dt;
+        }
     }
 }

@@ -47,8 +47,7 @@ namespace cured
             SqlDataAdapter adapter = new SqlDataAdapter();
             DataTable table = new DataTable();
 
-            // Изменил запрос чтобы получать все данные пользователя
-            string querystring = $"select UserID, Login, FullName, Phone, Role from Users where Login = '{login_user}' and Password = '{password_user}'";
+            string querystring = $"select Login, Password from Users where Login = '{login_user}' and Password = '{password_user}'";
 
             SqlCommand command = new SqlCommand(querystring, database.getConnection());
 
@@ -57,16 +56,10 @@ namespace cured
 
             if (table.Rows.Count == 1)
             {
-                // Сохраняем все данные пользователя
-                user.id_user = Convert.ToInt32(table.Rows[0]["UserID"]);
-                user.login_user = table.Rows[0]["Login"].ToString();
-                user.full_name = table.Rows[0]["FullName"].ToString();
-                user.phone = table.Rows[0]["Phone"].ToString();
-                user.role = table.Rows[0]["Role"].ToString();
+                MessageBox.Show("Вы успешно вошли!", "Успешно!", MessageBoxButtons.OK, MessageBoxIcon.Information );
 
                 acc_checked.acc_check = true;
-
-                MessageBox.Show($"Добро пожаловать, {user.full_name}!", "Успешно!", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                user.login_user = login_user;
 
                 main form_main = new main();
                 form_main.Show();
@@ -76,6 +69,11 @@ namespace cured
             {
                 MessageBox.Show("Такого аккаунта не существует(", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
