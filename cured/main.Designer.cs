@@ -85,6 +85,7 @@
             this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.pictureBox1.TabIndex = 2;
             this.pictureBox1.TabStop = false;
+            this.pictureBox1.Click += new System.EventHandler(this.pictureBox1_Click);
             // 
             // label5
             // 
@@ -98,17 +99,17 @@
             this.label5.Size = new System.Drawing.Size(190, 80);
             this.label5.TabIndex = 6;
             this.label5.Text = "Войти";
-            this.label5.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.label5.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             // 
             // label4
             // 
             this.label4.Cursor = System.Windows.Forms.Cursors.Hand;
             this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
             this.label4.ForeColor = System.Drawing.SystemColors.ButtonFace;
-            this.label4.Location = new System.Drawing.Point(969, 6);
+            this.label4.Location = new System.Drawing.Point(1180, -1);
             this.label4.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(205, 80);
+            this.label4.Size = new System.Drawing.Size(205, 97);
             this.label4.TabIndex = 5;
             this.label4.Text = "Контакты";
             this.label4.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -118,23 +119,24 @@
             this.label3.Cursor = System.Windows.Forms.Cursors.Hand;
             this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
             this.label3.ForeColor = System.Drawing.SystemColors.ButtonFace;
-            this.label3.Location = new System.Drawing.Point(645, 6);
+            this.label3.Location = new System.Drawing.Point(799, 3);
             this.label3.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(236, 80);
+            this.label3.Size = new System.Drawing.Size(202, 92);
             this.label3.TabIndex = 4;
             this.label3.Text = "Запчасти";
             this.label3.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.label3.Click += new System.EventHandler(this.label3_Click);
             // 
             // label2
             // 
             this.label2.Cursor = System.Windows.Forms.Cursors.Hand;
             this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
             this.label2.ForeColor = System.Drawing.SystemColors.ButtonFace;
-            this.label2.Location = new System.Drawing.Point(321, 6);
+            this.label2.Location = new System.Drawing.Point(405, -1);
             this.label2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(240, 80);
+            this.label2.Size = new System.Drawing.Size(240, 97);
             this.label2.TabIndex = 3;
             this.label2.Text = "Мотоциклы";
             this.label2.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;

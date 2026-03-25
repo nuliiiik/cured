@@ -114,7 +114,7 @@ namespace cured
             tabContacts.Controls.Clear();
             Label info = new Label
             {
-                Text = "Наши контакты:\nТелефон: +7 (900) 000-00-00\nАдрес: г. Москва, ул. Мотоциклетная, д. 1",
+                Text = "Контакты:\nТелефон: +7 (994) 088-35-45\nАдрес: г. Барнаул, ул. 80 Гвардейской дивизии, д. 41",
                 Location = new Point(50, 50),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 14)
@@ -143,87 +143,101 @@ namespace cured
         }
         #endregion
 
-        private void LoadData(int type)
+        private void pictureBox1_Click(object sender, EventArgs e)
         {
-            TableLayoutPanel table = tables[type];
-            if (table == null) return;
-            table.SuspendLayout();
-            table.Controls.Clear();
-
-            string query = "";
-            string order = "";
-
-            if (type == 1)
-            {
-                query = "SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description FROM Motorcycles WHERE Quantity > 0";
-                if (filterBrand != null && filterBrand.SelectedIndex > 0) query += " AND Brand = '" + filterBrand.SelectedItem.ToString() + "'";
-                if (decimal.TryParse(priceFrom.Text, out decimal pf)) query += " AND Price >= " + pf;
-                if (decimal.TryParse(priceTo.Text, out decimal pt)) query += " AND Price <= " + pt;
-                order = sortMoto.SelectedIndex == 0 ? " ORDER BY Price ASC" : sortMoto.SelectedIndex == 1 ? " ORDER BY Price DESC" : " ORDER BY Year DESC";
-            }
-            else if (type == 2)
-            {
-                query = "SELECT PartID as ID, PartName as Name, Price, ImageURL, 'part' as T, Brand as B, 0 as Year, 'Описание запчасти' as Description FROM Parts WHERE Quantity > 0";
-                order = sortParts.SelectedIndex == 0 ? " ORDER BY Price ASC" : sortParts.SelectedIndex == 1 ? " ORDER BY Price DESC" : " ORDER BY PartID DESC";
-            }
-            else
-            {
-                query = "SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description FROM Motorcycles UNION ALL SELECT PartID, PartName, Price, ImageURL, 'part', Brand, 0, 'Описание' FROM Parts";
-                order = sortMain.SelectedIndex == 0 ? " ORDER BY Price ASC" : sortMain.SelectedIndex == 1 ? " ORDER BY Price DESC" : " ORDER BY ID DESC";
-            }
-
-            try
-            {
-                DataTable dt = db.ExecuteQuery(query + order);
-                foreach (DataRow r in dt.Rows)
-                {
-                    ProductCard card = new ProductCard();
-                    card.labelName.Text = r["Name"].ToString();
-                    card.labelPrice.Text = string.Format("{0:N0} ₽", Convert.ToDecimal(r["Price"]));
-                    card.labelArticle.Text = "Арт: " + r["ID"].ToString();
-                    card.labelDetails.Text = r["B"].ToString() + (r["T"].ToString() == "moto" ? ", " + r["Year"] + " г." : "");
-
-                    int currentId = Convert.ToInt32(r["ID"]);
-                    string currentType = r["T"].ToString();
-                    string d_desc = r["Description"].ToString();
-                    string d_info = card.labelDetails.Text;
-
-                    string path = Path.Combine(Application.StartupPath, r["ImageURL"].ToString().TrimStart('/').Replace('/', '\\'));
-                    if (File.Exists(path)) card.pictureBox.Image = Image.FromFile(path);
-                    else card.pictureBox.Image = GetPlaceholder(r["B"].ToString());
-
-                    // ПРАВИЛЬНАЯ ЛОГИКА КЛИКА
-                    card.Click += (s, e) => {
-                        if (isDetailWindowOpen) return;
-                        isDetailWindowOpen = true;
-
-                        using (ProductDetails pd = new ProductDetails(
-                            card.labelArticle.Text, card.labelName.Text, card.labelPrice.Text,
-                            d_info, d_desc, card.pictureBox.Image, currentId, currentType))
-                        {
-                            pd.ShowDialog();
-                        }
-                        isDetailWindowOpen = false;
-                    };
-
-                    // Перенаправляем клики детей на родителя
-                    // Находим этот блок в методе LoadData файла main.cs
-                    foreach (Control child in card.Controls)
-                    {
-                        child.Cursor = Cursors.Hand;
-                        child.Click += (s, e) => {
-                            // Теперь мы вызываем созданный нами публичный метод
-                            card.PerformCardClick();
-                        };
-                    }
-                    card.Cursor = Cursors.Hand;
-
-                    table.Controls.Add(card);
-                }
-            }
-            catch (Exception ex) { MessageBox.Show("Ошибка: " + ex.Message); }
-            table.ResumeLayout();
+            if (!acc_checked.acc_check) new login().Show();
+            else if (user.role == "admin") new admin().Show();
+            else new profile().Show();
+            this.Hide();
         }
+
+        private void label3_Click(object sender, EventArgs e)
+        {
+
+        }
+        private void LoadData(int type)
+{
+    TableLayoutPanel table = tables[type];
+    if (table == null) return;
+    table.SuspendLayout();
+    table.Controls.Clear();
+
+    string query = "";
+    string order = "";
+
+    // 1. ИСПРАВЛЕНЫ ЗАПРОСЫ: Добавлен Quantity (Stock) и реальный Description
+    if (type == 1) // Мотоциклы
+    {
+        query = "SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description, Quantity as Stock FROM Motorcycles WHERE Quantity > 0";
+        if (filterBrand != null && filterBrand.SelectedIndex > 0) query += " AND Brand = '" + filterBrand.SelectedItem.ToString() + "'";
+        if (decimal.TryParse(priceFrom.Text, out decimal pf)) query += " AND Price >= " + pf;
+        if (decimal.TryParse(priceTo.Text, out decimal pt)) query += " AND Price <= " + pt;
+        order = sortMoto.SelectedIndex == 0 ? " ORDER BY Price ASC" : sortMoto.SelectedIndex == 1 ? " ORDER BY Price DESC" : " ORDER BY Year DESC";
+    }
+    else if (type == 2) // Запчасти
+    {
+        // ИСПРАВЛЕНО: берем Description из таблицы Parts
+        query = "SELECT PartID as ID, PartName as Name, Price, ImageURL, 'part' as T, Brand as B, 0 as Year, Description, Quantity as Stock FROM Parts WHERE Quantity > 0";
+        order = sortParts.SelectedIndex == 0 ? " ORDER BY Price ASC" : sortParts.SelectedIndex == 1 ? " ORDER BY Price DESC" : " ORDER BY PartID DESC";
+    }
+    else // Главная
+    {
+        query = @"SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description, Quantity as Stock FROM Motorcycles 
+                  UNION ALL 
+                  SELECT PartID, PartName, Price, ImageURL, 'part', Brand, 0, Description, Quantity FROM Parts";
+        order = sortMain.SelectedIndex == 0 ? " ORDER BY Price ASC" : sortMain.SelectedIndex == 1 ? " ORDER BY Price DESC" : " ORDER BY ID DESC";
+    }
+
+    try
+    {
+        DataTable dt = db.ExecuteQuery(query + order);
+        foreach (DataRow r in dt.Rows)
+        {
+            int currentId = Convert.ToInt32(r["ID"]);
+            string currentType = r["T"].ToString();
+            int currentStock = Convert.ToInt32(r["Stock"]); // Получаем остаток
+
+            // 2. ИСПРАВЛЕНО: Передаем параметры в конструктор
+            ProductCard card = new ProductCard(currentId, currentType, currentStock);
+            
+            card.labelName.Text = r["Name"].ToString();
+            card.labelPrice.Text = string.Format("{0:N0} ₽", Convert.ToDecimal(r["Price"]));
+            // Артикул теперь формируется сам внутри карточки, здесь можно не трогать или обновить
+            card.labelDetails.Text = r["B"].ToString() + (currentType == "moto" ? ", " + r["Year"] + " г." : "");
+
+            string d_desc = r["Description"].ToString();
+            string d_info = card.labelDetails.Text;
+
+            // Загрузка фото
+            string path = Path.Combine(Application.StartupPath, r["ImageURL"].ToString().TrimStart('/').Replace('/', '\\'));
+            if (File.Exists(path)) card.pictureBox.Image = Image.FromFile(path);
+            else card.pictureBox.Image = GetPlaceholder(r["B"].ToString());
+
+            // 3. ПРАВИЛЬНАЯ ЛОГИКА КЛИКА (Только на картинку и название)
+            // Мы не вешаем клик на ВСЮ карточку, чтобы не мешать кнопкам корзины
+            EventHandler openDetails = (s, e) => {
+                if (isDetailWindowOpen) return;
+                isDetailWindowOpen = true;
+                using (ProductDetails pd = new ProductDetails(
+                    card.labelArticle.Text, card.labelName.Text, card.labelPrice.Text,
+                    d_info, d_desc, card.pictureBox.Image, currentId, currentType))
+                {
+                    pd.ShowDialog();
+                    // После закрытия окна деталей обновляем данные (вдруг остаток изменился)
+                    LoadData(type); 
+                }
+                isDetailWindowOpen = false;
+            };
+
+            card.pictureBox.Click += openDetails;
+            card.labelName.Click += openDetails;
+
+            table.Controls.Add(card);
+        }
+    }
+    catch (Exception ex) { MessageBox.Show("Ошибка: " + ex.Message); }
+    table.ResumeLayout();
+}
 
         private Bitmap GetPlaceholder(string txt)
         {
