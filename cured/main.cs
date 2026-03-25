@@ -2,6 +2,7 @@
 using System.Data;
 using System.Drawing;
 using System.IO;
+using System.Net.NetworkInformation;
 using System.Windows.Forms;
 
 namespace cured
@@ -211,9 +212,36 @@ namespace cured
                     string d_info = card.labelDetails.Text;
 
                     // Попытка загрузки изображения
-                    string path = Path.Combine(Application.StartupPath, r["ImageURL"].ToString().TrimStart('/').Replace('/', '\\'));
-                    if (File.Exists(path)) card.pictureBox.Image = Image.FromFile(path);
-                    else card.pictureBox.Image = GetPlaceholder(r["B"].ToString());
+                    string imagePathFromDB = r["ImageURL"].ToString();
+
+                    // 1. Убираем лишние слэши и нормализуем путь (из БД может прийти /images/...)
+                    string cleanPath = imagePathFromDB.TrimStart('/').Replace('/', '\\');
+
+                    string solutionRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\..\\"));
+
+                    // 3. Формируем итоговый путь к картинке
+                    string finalPath = Path.Combine(solutionRoot, cleanPath);
+
+                    if (File.Exists(finalPath))
+                    {
+                        try
+                        {
+                            // Читаем байты, чтобы не блокировать файл
+                            using (var ms = new MemoryStream(File.ReadAllBytes(finalPath)))
+                            {
+                                card.pictureBox.Image = Image.FromStream(ms);
+                            }
+                        }
+                        catch
+                        {
+                            card.pictureBox.Image = GetPlaceholder("Ошибка чтения");
+                        }
+                    }
+                    else
+                    {
+                        // Если файл не найден, выводим заглушку с текстом бренда
+                        card.pictureBox.Image = GetPlaceholder(r["B"].ToString());
+                    }
 
                     // Логика открытия подробностей
                     EventHandler openDetails = (s, e) => {
