@@ -4,39 +4,78 @@ using System.Data.SqlClient;
 
 namespace cured
 {
+    /// <summary>
+    /// Класс для управления подключением и выполнения запросов к базе данных SQL Server.
+    /// Централизует логику доступа к данным для всего приложения.
+    /// </summary>
     class DataBase
     {
-        // ВНИМАНИЕ: Проверьте строку подключения! Она должна быть такой же, как в ваших рабочих формах.
-        private string connectionString = @"Data Source=DESKTOP-O67QLR8\CURSED;Initial Catalog=CURSED;Integrated Security=True";
+        #region Поля и Настройка подключения
 
-        SqlConnection con;
+        private string connectionString;
+        private SqlConnection con;
 
+        /// <summary>
+        /// Конструктор класса. Автоматически формирует строку подключения, 
+        /// адаптируясь под имя текущего компьютера.
+        /// </summary>
         public DataBase()
         {
+            // Используем построитель, чтобы избежать ошибок в синтаксисе строки
+            SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+
+            // Динамически подставляем имя ПК и экземпляр сервера \CURSED
+            builder.DataSource = $@"{Environment.MachineName}\CURSED";
+
+            // Название целевой базы данных
+            builder.InitialCatalog = "CURSED";
+
+            // Использование системной учетной записи Windows для входа
+            builder.IntegratedSecurity = true;
+
+            connectionString = builder.ConnectionString;
             con = new SqlConnection(connectionString);
         }
 
-        // Метод для ваших старых форм
-        public SqlConnection getConnection()
-        {
-            return con;
-        }
+        #endregion
 
+        #region Управление состоянием соединения
+
+        /// <summary>
+        /// Возвращает объект активного соединения. 
+        /// Используется в основном в админ-панели для работы SqlDataAdapter.
+        /// </summary>
+        public SqlConnection getConnection() => con;
+
+        /// <summary>
+        /// Открывает соединение с базой данных, если оно закрыто.
+        /// </summary>
         public void openConnection()
         {
             if (con.State == ConnectionState.Closed) con.Open();
         }
 
+        /// <summary>
+        /// Закрывает соединение с базой данных.
+        /// </summary>
         public void closeConnection()
         {
             if (con.State == ConnectionState.Open) con.Close();
         }
 
-        // Новый метод для добавления в корзину
+        #endregion
+
+        #region Методы выполнения запросов
+
+        /// <summary>
+        /// Выполняет команды, которые не возвращают данные (INSERT, UPDATE, DELETE).
+        /// </summary>
+        /// <param name="query">SQL запрос.</param>
         public void ExecuteNonQuery(string query)
         {
             try
             {
+                // Использование 'using' гарантирует закрытие соединения даже при ошибке
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
@@ -48,29 +87,54 @@ namespace cured
             }
             catch (Exception ex)
             {
-                // Выводим ошибку, чтобы понять, что не так с SQL или строкой подключения
-                throw new Exception("Ошибка БД: " + ex.Message);
+                throw new Exception("Ошибка выполнения команды (NonQuery): " + ex.Message);
             }
         }
 
+        /// <summary>
+        /// Выполняет запрос и возвращает результат в виде таблицы (DataTable).
+        /// Идеально подходит для заполнения DataGridView.
+        /// </summary>
+        /// <param name="query">SQL запрос (обычно SELECT).</param>
         public DataTable ExecuteQuery(string query)
         {
             DataTable dt = new DataTable();
-            using (SqlDataAdapter da = new SqlDataAdapter(query, connectionString))
+            try
             {
-                da.Fill(dt);
+                using (SqlDataAdapter da = new SqlDataAdapter(query, connectionString))
+                {
+                    da.Fill(dt);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Ошибка получения данных (Query): " + ex.Message);
             }
             return dt;
         }
 
+        /// <summary>
+        /// Выполняет запрос и возвращает только одно значение (первый столбец первой строки).
+        /// Используется для получения ID нового заказа или подсчета суммы.
+        /// </summary>
+        /// <param name="query">SQL запрос.</param>
         public object ExecuteScalar(string query)
         {
-            using (SqlConnection con = new SqlConnection(connectionString))
+            try
             {
-                con.Open();
-                SqlCommand cmd = new SqlCommand(query, con);
-                return cmd.ExecuteScalar();
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    SqlCommand cmd = new SqlCommand(query, connection);
+                    return cmd.ExecuteScalar();
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Ошибка получения единичного значения (Scalar): " + ex.Message);
             }
         }
+
+        #endregion
     }
 }

@@ -7,13 +7,20 @@ using System.Collections.Generic;
 
 namespace cured
 {
+    /// <summary>
+    /// Класс управления административной панелью.
+    /// Позволяет просматривать, редактировать и удалять данные напрямую из таблиц БД.
+    /// </summary>
     public partial class admin : Form
     {
+        #region Переменные и инициализация
+
         private DataGridView dgvAdmin;
         private ComboBox cbTables;
         private Button btnSave, btnDelete, btnBack;
         private Label lblTitle;
 
+        // Объекты для работы с данными
         DataBase db = new DataBase();
         SqlDataAdapter adapter;
         DataSet ds;
@@ -24,14 +31,22 @@ namespace cured
             CreateAdminInterface();
         }
 
+        #endregion
+
+        #region Интерфейс и Стилизация
+
+        /// <summary>
+        /// Динамическое создание элементов управления и настройка внешнего вида формы.
+        /// </summary>
         private void CreateAdminInterface()
         {
+            // Параметры окна
             this.Text = "Управление базой данных";
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Size = new Size(1100, 700);
             this.BackColor = Color.White;
 
-            // Заголовок в стиле DarkRed
+            // Заголовок в фирменном стиле DarkRed
             lblTitle = new Label
             {
                 Text = "ПАНЕЛЬ АДМИНИСТРАТОРА",
@@ -41,6 +56,7 @@ namespace cured
                 Font = new Font("Segoe UI", 16, FontStyle.Bold)
             };
 
+            // Выпадающий список для выбора таблиц
             cbTables = new ComboBox
             {
                 Location = new Point(20, 65),
@@ -50,11 +66,13 @@ namespace cured
             };
             cbTables.Items.AddRange(new string[] { "Users", "Motorcycles", "Parts", "Orders", "OrderItems", "Cart" });
 
+            // Событие смены таблицы
             cbTables.SelectedIndexChanged += (s, e) => {
                 if (cbTables.SelectedItem != null)
                     LoadTable(cbTables.SelectedItem.ToString());
             };
 
+            // Настройка основной таблицы данных
             dgvAdmin = new DataGridView
             {
                 Location = new Point(20, 110),
@@ -63,7 +81,7 @@ namespace cured
             };
             SetupGridStyle(dgvAdmin);
 
-            // Кнопки в стиле приложения
+            // Инициализация кнопок управления
             btnSave = CreateStyledButton("СОХРАНИТЬ ИЗМЕНЕНИЯ", new Point(20, 590), Color.ForestGreen);
             btnSave.Click += btnSave_Click;
 
@@ -73,6 +91,7 @@ namespace cured
             btnBack = CreateStyledButton("ВЕРНУТЬСЯ", new Point(880, 590), Color.Gray);
             btnBack.Click += (s, e) => this.Close();
 
+            // Добавление элементов на форму
             this.Controls.Add(lblTitle);
             this.Controls.Add(cbTables);
             this.Controls.Add(dgvAdmin);
@@ -81,6 +100,9 @@ namespace cured
             this.Controls.Add(btnBack);
         }
 
+        /// <summary>
+        /// Универсальный метод для создания кнопок в едином визуальном стиле.
+        /// </summary>
         private Button CreateStyledButton(string text, Point location, Color backColor)
         {
             return new Button
@@ -96,6 +118,9 @@ namespace cured
             };
         }
 
+        /// <summary>
+        /// Настройка визуального оформления DataGridView (цвета, шрифты, заголовки).
+        /// </summary>
         private void SetupGridStyle(DataGridView dgv)
         {
             dgv.EnableHeadersVisualStyles = false;
@@ -105,36 +130,51 @@ namespace cured
             dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgv.AllowUserToResizeRows = false;
 
-            // Шапка таблицы
+            // Стилизация шапки
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.DarkRed;
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 40;
 
-            // Строки
+            // Стилизация контента
             dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9);
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 235, 235);
             dgv.DefaultCellStyle.SelectionForeColor = Color.Black;
         }
 
+        #endregion
+
+        #region Работа с данными
+
+        /// <summary>
+        /// Загрузка данных из выбранной таблицы БД в DataGridView.
+        /// Использует SqlDataAdapter для автоматической генерации команд вставки/правки.
+        /// </summary>
         private void LoadTable(string tableName)
         {
             try
             {
                 string query = $"SELECT * FROM {tableName}";
                 SqlConnection con = db.getConnection();
+
                 adapter = new SqlDataAdapter(query, con);
-                SqlCommandBuilder builder = new SqlCommandBuilder(adapter);
+                SqlCommandBuilder builder = new SqlCommandBuilder(adapter); // Генерирует SQL команды Update/Delete
 
                 ds = new DataSet();
                 adapter.Fill(ds, tableName);
                 dgvAdmin.DataSource = ds.Tables[tableName];
 
-                TranslateColumns();
+                TranslateColumns(); // Локализация заголовков
             }
-            catch (Exception ex) { MessageBox.Show("Ошибка загрузки: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка загрузки данных: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
+        /// <summary>
+        /// Локализация заголовков столбцов из системных имен БД в читаемый русский вид.
+        /// </summary>
         private void TranslateColumns()
         {
             Dictionary<string, string> translations = new Dictionary<string, string>
@@ -147,7 +187,7 @@ namespace cured
                 { "Phone", "Телефон" },
                 { "Role", "Роль" },
 
-                // Мотоциклы / Запчасти (унифицировано)
+                // Мотоциклы и Запчасти
                 { "MotorcycleID", "ID Мото" },
                 { "PartID", "ID Детали" },
                 { "Brand", "Марка" },
@@ -155,13 +195,13 @@ namespace cured
                 { "Year", "Год" },
                 { "Price", "Цена (₽)" },
                 { "Description", "Описание" },
-                { "Quantity", "Остаток/Кол-во" }, // Stock заменен на Quantity для соответствия твоей базе
+                { "Quantity", "Остаток/Кол-во" },
                 { "PartName", "Название детали" },
 
-                // Заказы
+                // Заказы и логистика
                 { "OrderID", "№ Заказа" },
                 { "OrderDate", "Дата и время заказа" },
-                { "AddedDate", "Дата и время добавления" },// Твой запрос на перевод времени
+                { "AddedDate", "Дата и время добавления" },
                 { "TotalAmount", "Сумма (₽)" },
                 { "Status", "Статус" },
                 { "CartID", "ID Корзины" },
@@ -177,34 +217,52 @@ namespace cured
             }
         }
 
+        #endregion
+
+        #region Обработка событий
+
+        /// <summary>
+        /// Сохранение всех изменений, внесенных в таблицу, обратно в базу данных.
+        /// </summary>
         private void btnSave_Click(object sender, EventArgs e)
         {
             try
             {
                 if (adapter != null && ds != null && cbTables.SelectedItem != null)
                 {
-                    dgvAdmin.EndEdit();
+                    dgvAdmin.EndEdit(); // Завершаем редактирование текущей ячейки
                     adapter.Update(ds, cbTables.SelectedItem.ToString());
                     MessageBox.Show("База данных успешно обновлена!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
-            catch (Exception ex) { MessageBox.Show("Ошибка сохранения: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при сохранении изменений: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
+        /// <summary>
+        /// Удаление выделенной строки из таблицы с последующим обновлением БД.
+        /// </summary>
         private void btnDelete_Click(object sender, EventArgs e)
         {
             if (dgvAdmin.SelectedRows.Count > 0)
             {
-                if (MessageBox.Show("Удалить выбранную запись?", "Подтверждение", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                if (MessageBox.Show("Вы уверены, что хотите удалить выбранную запись?", "Подтверждение удаления",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     foreach (DataGridViewRow row in dgvAdmin.SelectedRows)
                     {
                         if (!row.IsNewRow) dgvAdmin.Rows.Remove(row);
                     }
+                    // После удаления в интерфейсе автоматически вызываем сохранение в базу
+                    btnSave_Click(null, null);
                 }
             }
         }
 
         private void admin_FormClosed(object sender, FormClosedEventArgs e) => new main().Show();
+
+        #endregion
     }
 }

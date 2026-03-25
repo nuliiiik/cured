@@ -1,13 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using System.Data.SqlClient;
 
 namespace cured
@@ -21,6 +15,7 @@ namespace cured
             InitializeComponent();
         }
 
+        // Возврат на главную при закрытии
         private void registr_FormClosed(object sender, FormClosedEventArgs e)
         {
             main form_main = new main();
@@ -28,6 +23,7 @@ namespace cured
             this.Hide();
         }
 
+        // Переход на окно входа
         private void label7_Click(object sender, EventArgs e)
         {
             login form_login = new login();
@@ -37,71 +33,95 @@ namespace cured
 
         private void button1_Click(object sender, EventArgs e)
         {
-            string name_user = textBox1.Text;
-            string login_user = textBox2.Text;
-            string password_user = textBox3.Text;
+            // 1. Собираем данные из полей
+            string name_user = textBox1.Text.Trim();
+            string login_user = textBox2.Text.Trim();
+            string password_user = textBox3.Text.Trim();
             string phone_user = maskedTextBox1.Text;
 
-            string querystring = $"insert into Users(FullName, Login, Password, Phone) values('{name_user}','{login_user}','{password_user}','{phone_user}')";
+            // 2. ПРОВЕРКА: Все ли поля заполнены?
+            // MaskedTextBox.MaskFull возвращает true, если маска заполнена до конца
+            if (string.IsNullOrEmpty(name_user) ||
+                string.IsNullOrEmpty(login_user) ||
+                string.IsNullOrEmpty(password_user) ||
+                !maskedTextBox1.MaskFull)
+            {
+                MessageBox.Show("Пожалуйста, заполните ВСЕ поля формы!\nУкажите ФИО, Логин, Пароль и полный номер телефона.",
+                                "Внимание", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return; // Прерываем выполнение метода, запрос в БД не уйдет
+            }
 
-            SqlCommand command = new SqlCommand(querystring, database.getConnection());
-
+            // 3. Проверяем, не занят ли логин (вызываем твой метод)
             if (checkuser())
             {
                 return;
             }
 
-            database.openConnection();
+            // 4. Если всё ок — регистрируем
+            string querystring = "insert into Users(FullName, Login, Password, Phone) values(@name, @login, @pass, @phone)";
 
-            if(command.ExecuteNonQuery() == 1)
+            SqlCommand command = new SqlCommand(querystring, database.getConnection());
+            command.Parameters.AddWithValue("@name", name_user);
+            command.Parameters.AddWithValue("@login", login_user);
+            command.Parameters.AddWithValue("@pass", password_user);
+            command.Parameters.AddWithValue("@phone", phone_user);
+
+            try
             {
-                MessageBox.Show("Аккаунт успешно был создан", "Успешно!", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                login form_login = new login();
-                form_login.Show();
-                this.Hide();
+                database.openConnection();
+                if (command.ExecuteNonQuery() == 1)
+                {
+                    MessageBox.Show("Аккаунт успешно создан!", "Успешно", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    login form_login = new login();
+                    form_login.Show();
+                    this.Hide();
+                }
+                else
+                {
+                    MessageBox.Show("Ошибка при создании аккаунта.", "Ошибка");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("Произошла ошибка, попробуйте снова!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Ошибка подключения к БД: " + ex.Message);
             }
-            database.closeConnection();
+            finally
+            {
+                database.closeConnection();
+            }
         }
 
+        /// <summary>
+        /// Проверяет, существует ли уже пользователь с таким ЛОГИНОМ.
+        /// </summary>
         private Boolean checkuser()
         {
             string login_user = textBox2.Text;
-            string password_user = textBox3.Text;
 
-            SqlDataAdapter adapter = new SqlDataAdapter(); 
+            // Проверяем ТОЛЬКО логин (пароль при проверке уникальности не важен)
+            string query = "SELECT UserID FROM Users WHERE Login = @login";
+            SqlCommand command = new SqlCommand(query, database.getConnection());
+            command.Parameters.AddWithValue("@login", login_user);
+
+            SqlDataAdapter adapter = new SqlDataAdapter(command);
             DataTable table = new DataTable();
-
-            string querystring = $"select UserID, Login, Password from Users where Login = '{login_user}' and Password = '{password_user}'";
-
-            SqlCommand command = new SqlCommand(querystring, database.getConnection());
-
-            adapter.SelectCommand = command;
             adapter.Fill(table);
 
-            if (table.Rows.Count > 0) 
+            if (table.Rows.Count > 0)
             {
-                MessageBox.Show("Произошла ошибка, такой аккаунт уже существует", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Пользователь с таким логином уже существует!", "Ошибка регистрации", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return true;
             }
-            else
-            {
-                return false;
-            }
+            return false;
         }
 
+        // Обработка нажатия Enter на поле ввода телефона
         private void maskedTextBox1_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter)
             {
-                // Вызываем событие клика нужной кнопки
                 button1.PerformClick();
-
-                // Подавляем стандартный звук "пиканья" Windows при нажатии Enter
-                e.SuppressKeyPress = true;
+                e.SuppressKeyPress = true; // Отключаем звук "бип"
             }
         }
     }
