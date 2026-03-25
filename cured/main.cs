@@ -116,7 +116,7 @@ namespace cured
 
             // Сортировка для мотоциклов
             CreateLabel(pnl, "Сортировать:", 540);
-            sortMoto = CreateSortCombo(pnl, new string[] { "Дешевле", "Дороже", "Новинки" }, 1);
+            sortMoto = CreateSortCombo(pnl, new string[] { "Цена (возр.)", "Цена (убыв.)", "Новинки" }, 1);
             sortMoto.Left = 640;
             sortMoto.SelectedIndex = 2;
 
