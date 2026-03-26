@@ -209,7 +209,7 @@ namespace cured
                 }
 
                 db.ExecuteNonQuery($"DELETE FROM Cart WHERE UserID = {user.id_user}");
-                MessageBox.Show($"Заказ №{newId} успешно оформлен!", "Поздравляем!");
+                MessageBox.Show($"Заказ №{newId} успешно оформлен!\nМы с вами свяжемся по номеру телефона {user.phone}", "Поздравляем!");
                 LoadCartData();
             }
             catch (Exception ex) { MessageBox.Show("Ошибка оформления: " + ex.Message); }
