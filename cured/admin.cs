@@ -140,6 +140,9 @@ namespace cured
             dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9);
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 235, 235);
             dgv.DefaultCellStyle.SelectionForeColor = Color.Black;
+
+            dgv.DataError += dgvAdmin_DataError;
+            dgv.CellValidating += dgvAdmin_CellValidating;
         }
 
         #endregion
@@ -224,6 +227,38 @@ namespace cured
         /// <summary>
         /// Сохранение всех изменений, внесенных в таблицу, обратно в базу данных.
         /// </summary>
+        /// 
+
+        // 1. Убираем системное окно "Красный крест"
+        private void dgvAdmin_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            // Подавляем исключение, чтобы программа не вылетала
+            e.ThrowException = false;
+        }
+
+        // 2. Универсальная проверка типов данных
+        private void dgvAdmin_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            // Получаем тип данных колонки из DataSource (DataSet)
+            Type columnType = dgvAdmin.Columns[e.ColumnIndex].ValueType;
+
+            // Если колонка ожидает целое число (int) или дробное (decimal/float)
+            if (columnType == typeof(int) || columnType == typeof(decimal) || columnType == typeof(double))
+            {
+                string input = e.FormattedValue.ToString();
+
+                // Если ячейка не пустая и мы не можем превратить текст в число
+                if (!string.IsNullOrEmpty(input) && !decimal.TryParse(input, out _))
+                {
+                    MessageBox.Show($"В колонку '{dgvAdmin.Columns[e.ColumnIndex].HeaderText}' можно вводить только числа!",
+                                    "Ошибка ввода", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                    dgvAdmin.CancelEdit(); // Возвращаем старое значение
+                    e.Cancel = true;       // Не даем выйти из ячейки
+                }
+            }
+        }
+
         private void btnSave_Click(object sender, EventArgs e)
         {
             try

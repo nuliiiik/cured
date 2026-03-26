@@ -46,6 +46,13 @@ namespace cured
 
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 235, 235);
             dgv.DefaultCellStyle.SelectionForeColor = Color.Black;
+
+            // Добавляем обработчики ошибок и валидации специально для корзины
+            if (dgv.Name == "dgvCart")
+            {
+                dgv.DataError += dgvCart_DataError;
+                dgv.CellValidating += dgvCart_CellValidating;
+            }
         }
 
         #region Аккаунт (Профиль)
@@ -217,6 +224,35 @@ namespace cured
         #endregion
 
         #region История Заказов
+
+        private void dgvCart_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            // Просто ставим флаг, что ошибка обработана
+            e.ThrowException = false;
+        }
+
+        // 2. Проверяем ввод пользователя ДО того, как он сохранится
+        private void dgvCart_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            // Проверяем только колонку "Кол-во"
+            if (dgvCart.Columns[e.ColumnIndex].Name == "Кол-во")
+            {
+                string input = e.FormattedValue.ToString();
+                int newQty;
+
+                // Если введено не число, или оно пустое, или отрицательное
+                if (!int.TryParse(input, out newQty) || newQty < 0)
+                {
+                    MessageBox.Show("Пожалуйста, вводите только целые положительные числа!",
+                                    "Ошибка формата", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                    // Отменяем переход и возвращаем старое значение
+                    dgvCart.CancelEdit();
+                    e.Cancel = true;
+                }
+            }
+        }
+
         private void LoadOrdersData()
         {
             // SQL запрос с группировкой товаров в одну строку для красоты таблицы
