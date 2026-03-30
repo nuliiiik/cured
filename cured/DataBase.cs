@@ -25,7 +25,7 @@ namespace cured
             SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
 
             // Динамически подставляем имя ПК и экземпляр сервера \CURSED
-            builder.DataSource = $@"{Environment.MachineName}\CURSED";
+            builder.DataSource = $@"{Environment.MachineName}\Имя_вашего_сервера";
 
             // Название целевой базы данных
             builder.InitialCatalog = "CURSED";
@@ -93,7 +93,6 @@ namespace cured
 
         /// <summary>
         /// Выполняет запрос и возвращает результат в виде таблицы (DataTable).
-        /// Идеально подходит для заполнения DataGridView.
         /// </summary>
         /// <param name="query">SQL запрос (обычно SELECT).</param>
         public DataTable ExecuteQuery(string query)
