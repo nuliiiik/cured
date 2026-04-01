@@ -1,0 +1,117 @@
+-- 1. Создание базы данных
+CREATE DATABASE [cursed];
+GO
+
+USE [cursed];
+GO
+
+-- 2. Таблица пользователей (Users)
+CREATE TABLE [dbo].[Users] (
+    [UserID]   INT IDENTITY(1,1) PRIMARY KEY,
+    [Login]    NVARCHAR(100) NOT NULL,
+    [Password] NVARCHAR(255) NOT NULL,
+    [FullName] NVARCHAR(255) NULL,
+    [Phone]    NVARCHAR(20)  NULL,
+    [Role]     NVARCHAR(50)  DEFAULT 'user'
+);
+
+-- 3. Таблица мотоциклов (Motorcycles)
+CREATE TABLE [dbo].[Motorcycles] (
+    [MotorcycleID] INT IDENTITY(1,1) PRIMARY KEY,
+    [Brand]        NVARCHAR(100),
+    [Model]        NVARCHAR(100),
+    [Year]         INT,
+    [Price]        DECIMAL(18, 2),
+    [Quantity]     INT, -- Текущее наличие
+    [ImageURL]     NVARCHAR(MAX),
+    [Description]  NVARCHAR(MAX),
+    [Stock]        INT  -- Резерв или складской остаток
+);
+
+-- 4. Таблица запчастей (Parts)
+CREATE TABLE [dbo].[Parts] (
+    [PartID]    INT IDENTITY(1,1) PRIMARY KEY,
+    [PartName]  NVARCHAR(255),
+    [Brand]     NVARCHAR(100),
+    [Price]     DECIMAL(18, 2),
+    [Quantity]  INT,
+    [ForModels] NVARCHAR(MAX), -- Для каких моделей подходит
+    [ImageURL]  NVARCHAR(MAX),
+    [Stock]     INT
+);
+
+-- 5. Таблица корзины (Cart)
+CREATE TABLE [dbo].[Cart] (
+    [CartID]       INT IDENTITY(1,1) PRIMARY KEY,
+    [UserID]       INT,
+    [MotorcycleID] INT NULL,
+    [PartID]       INT NULL,
+    [Quantity]     INT,
+    [AddedDate]    DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY ([UserID]) REFERENCES [dbo].[Users]([UserID]),
+    FOREIGN KEY ([MotorcycleID]) REFERENCES [dbo].[Motorcycles]([MotorcycleID]),
+    FOREIGN KEY ([PartID]) REFERENCES [dbo].[Parts]([PartID])
+);
+
+-- 6. Таблица заказов (Orders)
+CREATE TABLE [dbo].[Orders] (
+    [OrderID]        INT IDENTITY(1,1) PRIMARY KEY,
+    [UserID]         INT,
+    [OrderDate]      DATETIME DEFAULT GETDATE(),
+    [TotalAmount]    DECIMAL(18, 2),
+    [Status]         NVARCHAR(50),
+    [Address]        NVARCHAR(MAX),
+    [Phone]          NVARCHAR(20),
+    [PaymentMethod]  NVARCHAR(100),
+    [DeliveryMethod] NVARCHAR(100),
+    FOREIGN KEY ([UserID]) REFERENCES [dbo].[Users]([UserID])
+);
+
+-- 7. Таблица состава заказа (OrderItems)
+CREATE TABLE [dbo].[OrderItems] (
+    [OrderItemID]  INT IDENTITY(1,1) PRIMARY KEY,
+    [OrderID]      INT,
+    [MotorcycleID] INT NULL,
+    [PartID]       INT NULL,
+    [Quantity]     INT,
+    [Price]        DECIMAL(18, 2),
+    FOREIGN KEY ([OrderID]) REFERENCES [dbo].[Orders]([OrderID])
+);
+GO
+
+-- ==========================================================
+-- ЗАПОЛНЕНИЕ ДАННЫМИ СО СКРИНШОТОВ
+-- ==========================================================
+
+-- Пользователи
+INSERT INTO [dbo].[Users] ([Login], [Password], [FullName], [Phone], [Role]) VALUES
+('test', 'test', N'костя емае', '7-913-123-45-67', 'user'),
+('admin1', 'admin123', N'Admin User', '000-00-00', 'admin'),
+('такса', 'такса', N'такса', '7-800-555-35-35', 'user'),
+('WW', 'WW', N'WWadmin', '7-812-812-12-12', 'admin'),
+('1234567890', '1234567890', N'Серёга', '7-933-930-81-34', 'user');
+
+-- Мотоциклы
+INSERT INTO [dbo].[Motorcycles] ([Brand], [Model], [Year], [Price], [Quantity], [ImageURL], [Description], [Stock]) VALUES
+('Honba', 'CBR 600 RR', 2022, 1250000, 3, '/images/motocycles/Honba.png', N'Спортивный мотоцикл', 5),
+('Yamaka', 'YZF-R1', 2023, 1850000, 2, '/images/motocycles/Yamaha.png', N'Флагманский спортбайк', 5),
+('Kashasaki', 'Ninja 400', 2022, 650000, 5, '/images/motocycles/Kawasaki.png', N'Для начинающих', 5),
+('Suzuki', 'GSX-S750', 2021, 890000, 1, '/images/motocycles/Suzuki.png', N'Нейкед', 5),
+('BWM', 'S1000RR', 2023, 2250000, 1, '/images/motocycles/BMW.png', N'Премиальный', 5);
+
+-- Запчасти
+INSERT INTO [dbo].[Parts] ([PartName], [Brand], [Price], [Quantity], [ForModels], [ImageURL], [Stock]) VALUES
+(N'Тормозные колодки', 'Brembo', 4500, 25, 'Honda CBR, Yamaha R6', '/images/parts/Тормозные колодки.png', 20),
+(N'Масло моторное', 'Motul', 1200, 50, N'Универсальное', '/images/parts/Масло моторное.png', 20),
+(N'Цепь', 'DID', 8500, 12, N'520 размер', '/images/parts/Цепь.png', 20),
+(N'Свечи', 'NGK', 450, 100, 'CR8E', '/images/parts/Свечи.png', 20);
+
+-- Данные в корзине
+INSERT INTO [dbo].[Cart] ([UserID], [MotorcycleID], [PartID], [Quantity], [AddedDate]) VALUES
+(6, 10, NULL, 5, '2026-03-19 21:33:24.180');
+
+-- Состав заказов
+INSERT INTO [dbo].[OrderItems] ([OrderID], [MotorcycleID], [PartID], [Quantity], [Price]) VALUES
+(1, 1, NULL, 1, 1250000),
+(2, 6, NULL, 1, 1650000),
+(3, 7, NULL, 1, 980000);
