@@ -44,6 +44,7 @@
             this.panel2 = new System.Windows.Forms.Panel();
             this.checkAgreement = new System.Windows.Forms.CheckBox();
             this.labelDetails = new System.Windows.Forms.Label();
+            this.btnShowClosePass = new System.Windows.Forms.Button();
             this.panel2.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -199,11 +200,23 @@
             this.labelDetails.Text = "Подробнее";
             this.labelDetails.Click += new System.EventHandler(this.labelDetails_Click);
             // 
+            // btnShowClosePass
+            // 
+            this.btnShowClosePass.Location = new System.Drawing.Point(436, 190);
+            this.btnShowClosePass.Name = "btnShowClosePass";
+            this.btnShowClosePass.Size = new System.Drawing.Size(66, 34);
+            this.btnShowClosePass.TabIndex = 14;
+            this.btnShowClosePass.Text = "Скрыть пароль";
+            this.btnShowClosePass.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+            this.btnShowClosePass.UseVisualStyleBackColor = true;
+            this.btnShowClosePass.Click += new System.EventHandler(this.btnShowClosePass_Click);
+            // 
             // registr
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(524, 413);
+            this.Controls.Add(this.btnShowClosePass);
             this.Controls.Add(this.labelDetails);
             this.Controls.Add(this.checkAgreement);
             this.Controls.Add(this.button1);
@@ -251,5 +264,6 @@
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.CheckBox checkAgreement;
         private System.Windows.Forms.Label labelDetails;
+        private System.Windows.Forms.Button btnShowClosePass;
     }
 }

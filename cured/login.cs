@@ -31,6 +31,31 @@ namespace cured
         {
             // Скрываем символы пароля при загрузке формы
             textBox2.PasswordChar = '*';
+            // Устанавливаем начальный текст кнопки
+            btnShowClosePass.Text = "Показать пароль";
+        }
+
+        #endregion
+
+        #region Логика отображения пароля
+
+        /// <summary>
+        /// Переключает видимость пароля в поле ввода.
+        /// </summary>
+        private void btnShowClosePass_Click(object sender, EventArgs e)
+        {
+            if (textBox2.PasswordChar == '*')
+            {
+                // Показываем пароль
+                textBox2.PasswordChar = '\0'; // '\0' означает отсутствие маскировки
+                btnShowClosePass.Text = "Скрыть пароль";
+            }
+            else
+            {
+                // Скрываем пароль
+                textBox2.PasswordChar = '*';
+                btnShowClosePass.Text = "Показать пароль";
+            }
         }
 
         #endregion

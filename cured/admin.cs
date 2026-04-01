@@ -4,13 +4,10 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Data.SqlClient;
 using System.Collections.Generic;
+using System.Linq; // Обязательно для .ToList()
 
 namespace cured
 {
-    /// <summary>
-    /// Класс управления административной панелью.
-    /// Позволяет просматривать, редактировать и удалять данные напрямую из таблиц БД.
-    /// </summary>
     public partial class admin : Form
     {
         #region Переменные и инициализация
@@ -20,10 +17,20 @@ namespace cured
         private Button btnSave, btnDelete, btnBack;
         private Label lblTitle;
 
-        // Объекты для работы с данными
         DataBase db = new DataBase();
         SqlDataAdapter adapter;
         DataSet ds;
+
+        // Словарь сопоставления (Английское имя в БД -> Русское имя для юзера)
+        private Dictionary<string, string> tableMapping = new Dictionary<string, string>
+        {
+            { "Users", "Пользователи" },
+            { "Motorcycles", "Мотоциклы" },
+            { "Parts", "Запчасти" },
+            { "Orders", "Заказы" },
+            { "OrderItems", "Состав заказов" },
+            { "Cart", "Корзина" }
+        };
 
         public admin()
         {
@@ -33,20 +40,15 @@ namespace cured
 
         #endregion
 
-        #region Интерфейс и Стилизация
+        #region Интерфейс
 
-        /// <summary>
-        /// Динамическое создание элементов управления и настройка внешнего вида формы.
-        /// </summary>
         private void CreateAdminInterface()
         {
-            // Параметры окна
             this.Text = "Управление базой данных";
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Size = new Size(1100, 700);
             this.BackColor = Color.White;
 
-            // Заголовок в фирменном стиле DarkRed
             lblTitle = new Label
             {
                 Text = "ПАНЕЛЬ АДМИНИСТРАТОРА",
@@ -56,7 +58,6 @@ namespace cured
                 Font = new Font("Segoe UI", 16, FontStyle.Bold)
             };
 
-            // Выпадающий список для выбора таблиц
             cbTables = new ComboBox
             {
                 Location = new Point(20, 65),
@@ -64,15 +65,25 @@ namespace cured
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10)
             };
-            cbTables.Items.AddRange(new string[] { "Users", "Motorcycles", "Parts", "Orders", "OrderItems", "Cart" });
 
-            // Событие смены таблицы
-            cbTables.SelectedIndexChanged += (s, e) => {
-                if (cbTables.SelectedItem != null)
-                    LoadTable(cbTables.SelectedItem.ToString());
-            };
+            // 1. ПОДГОТОВКА ДАННЫХ
+            var displayList = tableMapping.ToList();
+            displayList.Insert(0, new KeyValuePair<string, string>("", "Выберите таблицу..."));
 
-            // Настройка основной таблицы данных
+            // 2. ПРИВЯЗКА ДАННЫХ
+            cbTables.DataSource = displayList;
+            cbTables.DisplayMember = "Value";
+            cbTables.ValueMember = "Key";
+
+            // 3. БЕЗОПАСНАЯ УСТАНОВКА ИНДЕКСА (Исправляет ArgumentOutOfRangeException)
+            if (cbTables.Items.Count > 0)
+            {
+                cbTables.SelectedIndex = 0;
+            }
+
+            // 4. ПОДПИСКА НА СОБЫТИЕ (Только после инициализации данных)
+            cbTables.SelectedIndexChanged += cbTables_SelectedIndexChanged;
+
             dgvAdmin = new DataGridView
             {
                 Location = new Point(20, 110),
@@ -81,7 +92,6 @@ namespace cured
             };
             SetupGridStyle(dgvAdmin);
 
-            // Инициализация кнопок управления
             btnSave = CreateStyledButton("СОХРАНИТЬ ИЗМЕНЕНИЯ", new Point(20, 590), Color.ForestGreen);
             btnSave.Click += btnSave_Click;
 
@@ -91,7 +101,6 @@ namespace cured
             btnBack = CreateStyledButton("ВЕРНУТЬСЯ", new Point(880, 590), Color.Gray);
             btnBack.Click += (s, e) => this.Close();
 
-            // Добавление элементов на форму
             this.Controls.Add(lblTitle);
             this.Controls.Add(cbTables);
             this.Controls.Add(dgvAdmin);
@@ -100,9 +109,6 @@ namespace cured
             this.Controls.Add(btnBack);
         }
 
-        /// <summary>
-        /// Универсальный метод для создания кнопок в едином визуальном стиле.
-        /// </summary>
         private Button CreateStyledButton(string text, Point location, Color backColor)
         {
             return new Button
@@ -118,9 +124,6 @@ namespace cured
             };
         }
 
-        /// <summary>
-        /// Настройка визуального оформления DataGridView (цвета, шрифты, заголовки).
-        /// </summary>
         private void SetupGridStyle(DataGridView dgv)
         {
             dgv.EnableHeadersVisualStyles = false;
@@ -128,95 +131,84 @@ namespace cured
             dgv.RowHeadersVisible = false;
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgv.AllowUserToResizeRows = false;
-
-            // Стилизация шапки
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.DarkRed;
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 40;
-
-            // Стилизация контента
-            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9);
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 235, 235);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.Black;
-
-            dgv.DataError += dgvAdmin_DataError;
-            dgv.CellValidating += dgvAdmin_CellValidating;
+            dgv.DataError += (s, e) => { e.ThrowException = false; };
         }
 
         #endregion
 
         #region Работа с данными
 
-        /// <summary>
-        /// Загрузка данных из выбранной таблицы БД в DataGridView.
-        /// Использует SqlDataAdapter для автоматической генерации команд вставки/правки.
-        /// </summary>
+        private void cbTables_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string selectedTable = cbTables.SelectedValue?.ToString();
+            if (!string.IsNullOrEmpty(selectedTable))
+            {
+                LoadTable(selectedTable);
+            }
+            else
+            {
+                dgvAdmin.DataSource = null;
+            }
+        }
+
         private void LoadTable(string tableName)
         {
             try
             {
-                string query = $"SELECT * FROM {tableName}";
+                // Используем SELECT *, чтобы избежать ошибок с именами столбцов
+                string query = $"SELECT * FROM [{tableName}]";
                 SqlConnection con = db.getConnection();
 
                 adapter = new SqlDataAdapter(query, con);
-                SqlCommandBuilder builder = new SqlCommandBuilder(adapter); // Генерирует SQL команды Update/Delete
+                SqlCommandBuilder builder = new SqlCommandBuilder(adapter);
 
                 ds = new DataSet();
                 adapter.Fill(ds, tableName);
                 dgvAdmin.DataSource = ds.Tables[tableName];
 
-                TranslateColumns(); // Локализация заголовков
+                TranslateColumns();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка загрузки данных: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Ошибка SQL: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        /// <summary>
-        /// Локализация заголовков столбцов из системных имен БД в читаемый русский вид.
-        /// </summary>
         private void TranslateColumns()
         {
+            // Словарь переводов для ВСЕХ возможных колонок из ваших таблиц
             Dictionary<string, string> translations = new Dictionary<string, string>
             {
-                // Пользователи
                 { "UserID", "ID" },
                 { "Login", "Логин" },
                 { "Password", "Пароль" },
                 { "FullName", "ФИО" },
                 { "Phone", "Телефон" },
                 { "Role", "Роль" },
-
-                // Мотоциклы и Запчасти
                 { "MotorcycleID", "ID Мото" },
                 { "PartID", "ID Детали" },
                 { "Brand", "Марка" },
                 { "Model", "Модель" },
+                { "ForModels", "Для моделей" }, // Исправлено для таблицы Parts
                 { "Year", "Год" },
                 { "Price", "Цена (₽)" },
                 { "Description", "Описание" },
-                { "Quantity", "Остаток/Кол-во" },
+                { "Quantity", "Кол-во" },
                 { "PartName", "Название детали" },
-
-                // Заказы и логистика
                 { "OrderID", "№ Заказа" },
-                { "OrderDate", "Дата и время заказа" },
-                { "AddedDate", "Дата и время добавления" },
+                { "OrderDate", "Дата заказа" },
                 { "TotalAmount", "Сумма (₽)" },
                 { "Status", "Статус" },
-                { "CartID", "ID Корзины" },
-                { "OrderItemID", "ID Позиции" }
+                { "ImageURL", "Путь к фото" }
             };
 
             foreach (DataGridViewColumn col in dgvAdmin.Columns)
             {
                 if (translations.ContainsKey(col.Name))
-                {
                     col.HeaderText = translations[col.Name];
-                }
             }
         }
 
@@ -224,74 +216,47 @@ namespace cured
 
         #region Обработка событий
 
-        /// <summary>
-        /// Сохранение всех изменений, внесенных в таблицу, обратно в базу данных.
-        /// </summary>
-        /// 
-
-        // 1. Убираем системное окно "Красный крест"
-        private void dgvAdmin_DataError(object sender, DataGridViewDataErrorEventArgs e)
-        {
-            // Подавляем исключение, чтобы программа не вылетала
-            e.ThrowException = false;
-        }
-
-        // 2. Универсальная проверка типов данных
-        private void dgvAdmin_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
-        {
-            // Получаем тип данных колонки из DataSource (DataSet)
-            Type columnType = dgvAdmin.Columns[e.ColumnIndex].ValueType;
-
-            // Если колонка ожидает целое число (int) или дробное (decimal/float)
-            if (columnType == typeof(int) || columnType == typeof(decimal) || columnType == typeof(double))
-            {
-                string input = e.FormattedValue.ToString();
-
-                // Если ячейка не пустая и мы не можем превратить текст в число
-                if (!string.IsNullOrEmpty(input) && !decimal.TryParse(input, out _))
-                {
-                    MessageBox.Show($"В колонку '{dgvAdmin.Columns[e.ColumnIndex].HeaderText}' можно вводить только числа!",
-                                    "Ошибка ввода", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-
-                    dgvAdmin.CancelEdit(); // Возвращаем старое значение
-                    e.Cancel = true;       // Не даем выйти из ячейки
-                }
-            }
-        }
-
         private void btnSave_Click(object sender, EventArgs e)
         {
             try
             {
-                if (adapter != null && ds != null && cbTables.SelectedItem != null)
+                string selectedTable = cbTables.SelectedValue?.ToString();
+                if (adapter != null && ds != null && !string.IsNullOrEmpty(selectedTable))
                 {
-                    dgvAdmin.EndEdit(); // Завершаем редактирование текущей ячейки
-                    adapter.Update(ds, cbTables.SelectedItem.ToString());
-                    MessageBox.Show("База данных успешно обновлена!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    dgvAdmin.EndEdit();
+                    adapter.Update(ds, selectedTable);
+                    MessageBox.Show("Изменения сохранены!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка при сохранении изменений: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Ошибка сохранения: " + ex.Message);
             }
         }
 
-        /// <summary>
-        /// Удаление выделенной строки из таблицы с последующим обновлением БД.
-        /// </summary>
         private void btnDelete_Click(object sender, EventArgs e)
         {
             if (dgvAdmin.SelectedRows.Count > 0)
             {
-                if (MessageBox.Show("Вы уверены, что хотите удалить выбранную запись?", "Подтверждение удаления",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (MessageBox.Show("Удалить выбранную запись?", "Подтверждение", MessageBoxButtons.YesNo) == DialogResult.Yes)
                 {
                     foreach (DataGridViewRow row in dgvAdmin.SelectedRows)
                     {
                         if (!row.IsNewRow) dgvAdmin.Rows.Remove(row);
                     }
-                    // После удаления в интерфейсе автоматически вызываем сохранение в базу
-                    btnSave_Click(null, null);
+                    btnSave_Click(null, null); // Сразу сохраняем в БД
+                }
+            }
+        }
+
+        private void dgvAdmin_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            if (dgvAdmin.Columns[e.ColumnIndex].ValueType == typeof(int) || dgvAdmin.Columns[e.ColumnIndex].ValueType == typeof(decimal))
+            {
+                if (!string.IsNullOrEmpty(e.FormattedValue.ToString()) && !decimal.TryParse(e.FormattedValue.ToString(), out _))
+                {
+                    MessageBox.Show("Здесь должно быть число!");
+                    e.Cancel = true;
                 }
             }
         }

@@ -1,62 +1,64 @@
 ﻿using System;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace cured
 {
     public partial class profile : Form
     {
-        DataBase db = new DataBase();
+        private DataBase db = new DataBase();
 
-        public profile() { InitializeComponent(); }
+        public profile()
+        {
+            InitializeComponent();
+            // Подвязываем Enter к текстовым полям для сохранения профиля
+            textBox1.KeyDown += CheckEnter;
+            textBox2.KeyDown += CheckEnter;
+            textBox3.KeyDown += CheckEnter;
+        }
 
         private void profile_Load(object sender, EventArgs e)
         {
             if (user.id_user <= 0) { this.Close(); return; }
 
-            // Скрываем стандартные вкладки TabControl для кастомного меню
+            // Настройка вкладок
             tabControl1.Appearance = TabAppearance.FlatButtons;
             tabControl1.ItemSize = new Size(0, 1);
             tabControl1.SizeMode = TabSizeMode.Fixed;
 
-            // Настройка дизайна таблиц
-            SetupTableStyle(dgvCart);
-            SetupTableStyle(dgvOrders);
+            // ПРИМЕНЕНИЕ ТВОИХ СТИЛЕЙ
+            ApplyGridStyles(dgvCart);
+            ApplyGridStyles(dgvOrders);
 
-            // Загружаем данные пользователя сразу
+            // Подписка на события
+            dgvCart.CellDoubleClick += dgvCart_CellDoubleClick;
+            dgvCart.CellValueChanged += dgvCart_CellValueChanged;
+
             LoadUserData();
+            LoadCartData();
+            LoadOrdersData();
         }
 
-        private void SetupTableStyle(DataGridView dgv)
+        private void ApplyGridStyles(DataGridView dgv)
         {
-            dgv.BackgroundColor = Color.White;
-            dgv.BorderStyle = BorderStyle.None;
-            dgv.RowHeadersVisible = false;
-            dgv.AllowUserToAddRows = false;
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgv.AllowUserToResizeRows = false;
-            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-
             dgv.EnableHeadersVisualStyles = false;
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.DarkRed;
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 35;
+            dgv.BackgroundColor = Color.White;
+            dgv.BorderStyle = BorderStyle.None;
+            dgv.RowHeadersVisible = false;
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv.AllowUserToAddRows = false;
 
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 235, 235);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.Black;
-
-            // Добавляем обработчики ошибок и валидации специально для корзины
-            if (dgv.Name == "dgvCart")
-            {
-                dgv.DataError += dgvCart_DataError;
-                dgv.CellValidating += dgvCart_CellValidating;
-            }
+            // Базовый режим — по содержимому, позже для главных столбцов переопределим
+            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
         }
 
-        #region Аккаунт (Профиль)
-        private void LoadUserData()
+        #region АККАУНТ
+        public void LoadUserData()
         {
             DataTable dt = db.ExecuteQuery($"SELECT FullName, Login, Password, Phone FROM Users WHERE UserID = {user.id_user}");
             if (dt.Rows.Count > 0)
@@ -70,44 +72,42 @@ namespace cured
 
         private void button1_Click(object sender, EventArgs e)
         {
-            string query = $@"UPDATE Users SET FullName = '{textBox1.Text}', Login = '{textBox2.Text}', 
-                            Password = '{textBox3.Text}', Phone = '{maskedTextBox1.Text}' WHERE UserID = {user.id_user}";
-            db.ExecuteNonQuery(query);
-            user.full_name = textBox1.Text;
-            MessageBox.Show("Данные профиля успешно обновлены!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (textBox2.Text.Length < 4 || textBox3.Text.Length < 4)
+            {
+                MessageBox.Show("Логин и пароль должны быть не короче 4 символов!");
+                return;
+            }
+
+            db.ExecuteNonQuery($@"UPDATE Users SET FullName = N'{textBox1.Text}', Login = '{textBox2.Text}', 
+                                Password = '{textBox3.Text}', Phone = '{maskedTextBox1.Text}' WHERE UserID = {user.id_user}");
+            MessageBox.Show("Данные профиля обновлены!");
+        }
+
+        private void CheckEnter(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                button1.PerformClick();
+                e.SuppressKeyPress = true;
+            }
         }
         #endregion
 
-        #region Корзина
-        private void LoadCartData()
+        #region КОРЗИНА
+        public void LoadCartData()
         {
-            // Отключаем событие на время загрузки, чтобы не вызвать зацикливание
             dgvCart.CellValueChanged -= dgvCart_CellValueChanged;
 
-            // Тянем данные сразу из трех таблиц (Cart + Motorcycles + Parts)
             string query = $@"SELECT c.CartID, c.MotorcycleID, c.PartID,
                             ISNULL(m.Brand + ' ' + m.Model, p.PartName) AS [Товар],
                             c.Quantity AS [Кол-во], 
-                            ISNULL(m.Quantity, p.Quantity) AS [НаСкладе],
+                            ISNULL(m.Quantity, p.Quantity) AS [Stock],
                             ISNULL(m.Price, p.Price) AS [Цена],
                             (c.Quantity * ISNULL(m.Price, p.Price)) AS [Сумма]
                             FROM Cart c 
                             LEFT JOIN Motorcycles m ON c.MotorcycleID = m.MotorcycleID
                             LEFT JOIN Parts p ON c.PartID = p.PartID 
                             WHERE c.UserID = {user.id_user}";
-
-            DataTable dt = db.ExecuteQuery(query);
-
-            // Синхронизация: если товара нет на складе - удаляем из корзины, если мало - уменьшаем
-            foreach (DataRow row in dt.Rows)
-            {
-                int inCart = Convert.ToInt32(row["Кол-во"]);
-                int inStock = Convert.ToInt32(row["НаСкладе"]);
-                int cartId = Convert.ToInt32(row["CartID"]);
-
-                if (inStock <= 0) db.ExecuteNonQuery($"DELETE FROM Cart WHERE CartID = {cartId}");
-                else if (inCart > inStock) db.ExecuteNonQuery($"UPDATE Cart SET Quantity = {inStock} WHERE CartID = {cartId}");
-            }
 
             dgvCart.DataSource = db.ExecuteQuery(query);
 
@@ -116,20 +116,16 @@ namespace cured
                 dgvCart.Columns["CartID"].Visible = false;
                 dgvCart.Columns["MotorcycleID"].Visible = false;
                 dgvCart.Columns["PartID"].Visible = false;
-                dgvCart.Columns["НаСкладе"].Visible = false;
+                dgvCart.Columns["Stock"].Visible = false;
 
-                // Настройка редактирования колонки "Кол-во"
-                dgvCart.ReadOnly = false;
-                foreach (DataGridViewColumn col in dgvCart.Columns)
-                {
-                    if (col.Name == "Кол-во")
-                    {
-                        col.ReadOnly = false;
-                        col.DefaultCellStyle.ForeColor = Color.DarkRed;
-                        col.DefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-                    }
-                    else col.ReadOnly = true;
-                }
+                foreach (DataGridViewColumn col in dgvCart.Columns) col.ReadOnly = true;
+                dgvCart.Columns["Кол-во"].ReadOnly = false;
+
+                // НАСТРОЙКА ШИРИНЫ КОРЗИНЫ
+                dgvCart.Columns["Товар"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; // Забирает всё место
+                dgvCart.Columns["Кол-во"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                dgvCart.Columns["Цена"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                dgvCart.Columns["Сумма"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             }
 
             UpdateTotalSum();
@@ -142,37 +138,60 @@ namespace cured
 
             if (dgvCart.Columns[e.ColumnIndex].Name == "Кол-во")
             {
-                try
-                {
-                    int cartId = Convert.ToInt32(dgvCart.Rows[e.RowIndex].Cells["CartID"].Value);
-                    int inStock = Convert.ToInt32(dgvCart.Rows[e.RowIndex].Cells["НаСкладе"].Value);
-                    int newQty = Convert.ToInt32(dgvCart.Rows[e.RowIndex].Cells[e.ColumnIndex].Value);
+                int cartId = Convert.ToInt32(dgvCart.Rows[e.RowIndex].Cells["CartID"].Value);
+                int stock = Convert.ToInt32(dgvCart.Rows[e.RowIndex].Cells["Stock"].Value);
 
-                    if (newQty > inStock)
+                if (int.TryParse(dgvCart.Rows[e.RowIndex].Cells["Кол-во"].Value.ToString(), out int newQty))
+                {
+                    if (newQty > stock)
                     {
-                        MessageBox.Show($"На складе доступно только: {inStock}", "Лимит превышен");
-                        newQty = inStock;
+                        MessageBox.Show($"Извините, на складе доступно только {stock} шт.!", "Недостаточно товара");
+                        newQty = stock;
                     }
 
                     if (newQty <= 0) db.ExecuteNonQuery($"DELETE FROM Cart WHERE CartID = {cartId}");
                     else db.ExecuteNonQuery($"UPDATE Cart SET Quantity = {newQty} WHERE CartID = {cartId}");
-
-                    LoadCartData();
                 }
-                catch { LoadCartData(); }
+                LoadCartData();
             }
         }
 
-        private void UpdateTotalSum()
+        private void dgvCart_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
-            decimal total = 0;
-            foreach (DataGridViewRow row in dgvCart.Rows)
+            if (e.RowIndex < 0 || dgvCart.Columns[e.ColumnIndex].Name == "Кол-во") return;
+
+            int mId = 0, pId = 0;
+            int.TryParse(dgvCart.Rows[e.RowIndex].Cells["MotorcycleID"].Value?.ToString(), out mId);
+            int.TryParse(dgvCart.Rows[e.RowIndex].Cells["PartID"].Value?.ToString(), out pId);
+
+            int id = (mId > 0) ? mId : pId;
+            string type = (mId > 0) ? "moto" : "part";
+
+            string sql = (type == "moto")
+                ? $"SELECT Brand, Model, Price, Description, ImageURL FROM Motorcycles WHERE MotorcycleID = {id}"
+                : $"SELECT Brand, PartName as Model, Price, Description, ImageURL FROM Parts WHERE PartID = {id}";
+
+            DataTable dt = db.ExecuteQuery(sql);
+            if (dt.Rows.Count > 0)
             {
-                if (!row.IsNewRow && row.Cells["Сумма"].Value != DBNull.Value)
-                    total += Convert.ToDecimal(row.Cells["Сумма"].Value);
+                DataRow r = dt.Rows[0];
+                string name = (type == "moto") ? $"{r["Brand"]} {r["Model"]}" : r["Model"].ToString();
+
+                Image img = null;
+                try
+                {
+                    string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\..\\", r["ImageURL"].ToString().TrimStart('/').Replace('/', '\\'));
+                    if (File.Exists(path))
+                    {
+                        using (var ms = new MemoryStream(File.ReadAllBytes(path))) img = Image.FromStream(ms);
+                    }
+                }
+                catch { }
+
+                ProductDetails pd = new ProductDetails("", name, $"{Convert.ToDecimal(r["Price"]):N0} ₽", r["Brand"].ToString(), r["Description"].ToString(), img, id, type);
+                pd.ShowDialog();
+                LoadCartData();
             }
-            // Используем lblTotal согласно твоим правкам
-            lblTotal.Text = $"Итого: {total:N0} ₽";
         }
 
         private void btnDelete_Click(object sender, EventArgs e)
@@ -183,115 +202,93 @@ namespace cured
             LoadCartData();
         }
 
-        private void btnAddOrder_Click(object sender, EventArgs e)
+        private void btnClearCart_Click(object sender, EventArgs e)
         {
-            if (dgvCart.Rows.Count == 0) { MessageBox.Show("Добавьте товары в корзину перед оформлением."); return; }
-            if (string.IsNullOrWhiteSpace(textBox1.Text) || maskedTextBox1.Text.Length < 10) { MessageBox.Show("Заполните имя и контактный телефон в профиле!"); return; }
-
-            try
+            if (dgvCart.Rows.Count == 0) return;
+            if (MessageBox.Show("Полностью очистить корзину?", "Внимание", MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
-                decimal total = 0;
-                foreach (DataGridViewRow row in dgvCart.Rows) total += Convert.ToDecimal(row.Cells["Сумма"].Value);
-
-                // Создаем заказ и получаем его ID
-                string insertOrder = $@"INSERT INTO Orders (UserID, OrderDate, TotalAmount, Status, Phone) 
-                                       VALUES ({user.id_user}, GETDATE(), {total.ToString().Replace(',', '.')}, N'Новый', '{maskedTextBox1.Text}');
-                                       SELECT SCOPE_IDENTITY();";
-                int newId = Convert.ToInt32(db.ExecuteScalar(insertOrder));
-
-                // Переносим товары из корзины в детали заказа
-                foreach (DataGridViewRow row in dgvCart.Rows)
-                {
-                    string mId = row.Cells["MotorcycleID"].Value == DBNull.Value ? "NULL" : row.Cells["MotorcycleID"].Value.ToString();
-                    string pId = row.Cells["PartID"].Value == DBNull.Value ? "NULL" : row.Cells["PartID"].Value.ToString();
-                    int qty = Convert.ToInt32(row.Cells["Кол-во"].Value);
-                    decimal price = Convert.ToDecimal(row.Cells["Цена"].Value);
-
-                    db.ExecuteNonQuery($@"INSERT INTO OrderItems (OrderID, MotorcycleID, PartID, Quantity, Price)
-                                         VALUES ({newId}, {mId}, {pId}, {qty}, {price.ToString().Replace(',', '.')})");
-
-                    // Списываем товар со склада
-                    if (mId != "NULL") db.ExecuteNonQuery($"UPDATE Motorcycles SET Quantity = Quantity - {qty} WHERE MotorcycleID = {mId}");
-                    else db.ExecuteNonQuery($"UPDATE Parts SET Quantity = Quantity - {qty} WHERE PartID = {pId}");
-                }
-
                 db.ExecuteNonQuery($"DELETE FROM Cart WHERE UserID = {user.id_user}");
-                MessageBox.Show($"Заказ №{newId} успешно оформлен!\nМы с вами свяжемся по номеру телефона {user.phone}", "Поздравляем!");
                 LoadCartData();
             }
-            catch (Exception ex) { MessageBox.Show("Ошибка оформления: " + ex.Message); }
+        }
+
+        private void btnAddOrder_Click(object sender, EventArgs e)
+        {
+            if (dgvCart.Rows.Count == 0) return;
+            if (!maskedTextBox1.MaskFull) { MessageBox.Show("Укажите номер телефона!"); return; }
+
+            decimal total = 0;
+            foreach (DataGridViewRow row in dgvCart.Rows) total += Convert.ToDecimal(row.Cells["Сумма"].Value);
+
+            string q = $@"INSERT INTO Orders (UserID, OrderDate, TotalAmount, Status, Phone) 
+                        VALUES ({user.id_user}, GETDATE(), {total.ToString().Replace(',', '.')}, N'Новый', '{maskedTextBox1.Text}'); SELECT SCOPE_IDENTITY();";
+            int orderId = Convert.ToInt32(db.ExecuteScalar(q));
+
+            foreach (DataGridViewRow row in dgvCart.Rows)
+            {
+                string mid = row.Cells["MotorcycleID"].Value == DBNull.Value ? "NULL" : row.Cells["MotorcycleID"].Value.ToString();
+                string pid = row.Cells["PartID"].Value == DBNull.Value ? "NULL" : row.Cells["PartID"].Value.ToString();
+                db.ExecuteNonQuery($"INSERT INTO OrderItems (OrderID, MotorcycleID, PartID, Quantity, Price) VALUES ({orderId}, {mid}, {pid}, {row.Cells["Кол-во"].Value}, {row.Cells["Цена"].Value.ToString().Replace(',', '.')})");
+            }
+            db.ExecuteNonQuery($"DELETE FROM Cart WHERE UserID = {user.id_user}");
+            MessageBox.Show("Заказ успешно оформлен!");
+            LoadCartData();
+            LoadOrdersData();
         }
         #endregion
 
-        #region История Заказов
-
-        private void dgvCart_DataError(object sender, DataGridViewDataErrorEventArgs e)
-        {
-            // Просто ставим флаг, что ошибка обработана
-            e.ThrowException = false;
-        }
-
-        // 2. Проверяем ввод пользователя ДО того, как он сохранится
-        private void dgvCart_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
-        {
-            // Проверяем только колонку "Кол-во"
-            if (dgvCart.Columns[e.ColumnIndex].Name == "Кол-во")
-            {
-                string input = e.FormattedValue.ToString();
-                int newQty;
-
-                // Если введено не число, или оно пустое, или отрицательное
-                if (!int.TryParse(input, out newQty) || newQty < 0)
-                {
-                    MessageBox.Show("Пожалуйста, вводите только целые положительные числа!",
-                                    "Ошибка формата", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-
-                    // Отменяем переход и возвращаем старое значение
-                    dgvCart.CancelEdit();
-                    e.Cancel = true;
-                }
-            }
-        }
-
+        #region ИСТОРИЯ
         private void LoadOrdersData()
         {
-            // SQL запрос с группировкой товаров в одну строку для красоты таблицы
-            string query = $@"
-                SELECT 
-                    o.OrderID as [№], 
-                    FORMAT(o.OrderDate, 'dd.MM.yyyy HH:mm') as [Дата], 
-                    (SELECT STUFF((
-                        SELECT ', ' + ISNULL(m.Brand + ' ' + m.Model, p.PartName) + ' (' + CAST(oi.Quantity AS VARCHAR) + ' шт.)'
-                        FROM OrderItems oi 
-                        LEFT JOIN Motorcycles m ON oi.MotorcycleID = m.MotorcycleID
-                        LEFT JOIN Parts p ON oi.PartID = p.PartID
-                        WHERE oi.OrderID = o.OrderID 
-                        FOR XML PATH('')), 1, 2, '')) as [Состав заказа],
-                    CAST(o.TotalAmount AS DECIMAL(18,0)) as [Сумма], 
-                    o.Status as [Статус]
-                FROM Orders o 
-                WHERE o.UserID = {user.id_user} 
-                ORDER BY o.OrderDate DESC";
+            string query = $@"SELECT o.OrderID as [№], FORMAT(o.OrderDate, 'dd.MM.yyyy HH:mm') as [Дата], 
+                (SELECT STUFF((SELECT ', ' + ISNULL(m.Brand + ' ' + m.Model, p.PartName) + ' (' + CAST(oi.Quantity AS VARCHAR) + ' шт.)'
+                 FROM OrderItems oi LEFT JOIN Motorcycles m ON oi.MotorcycleID = m.MotorcycleID LEFT JOIN Parts p ON oi.PartID = p.PartID
+                 WHERE oi.OrderID = o.OrderID FOR XML PATH('')), 1, 2, '')) as [Состав заказа],
+                CAST(o.TotalAmount AS DECIMAL(18,0)) as [Сумма], o.Status as [Статус]
+                FROM Orders o WHERE o.UserID = {user.id_user} ORDER BY o.OrderDate DESC";
 
             dgvOrders.DataSource = db.ExecuteQuery(query);
+
+            if (dgvOrders.Columns.Count > 0)
+            {
+                // НАСТРОЙКА ШИРИНЫ ИСТОРИИ ЗАКАЗОВ
+                dgvOrders.Columns["№"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                dgvOrders.Columns["Дата"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                dgvOrders.Columns["Сумма"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                dgvOrders.Columns["Статус"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+
+                // Главный столбец расширяется на всё свободное пространство
+                dgvOrders.Columns["Состав заказа"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+
+                // Разрешаем перенос текста в составе заказа для наглядности
+                dgvOrders.Columns["Состав заказа"].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+                dgvOrders.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+            }
         }
 
         private void DeleteOrderBtn_Click(object sender, EventArgs e)
         {
             if (dgvOrders.SelectedRows.Count == 0) return;
-            int orderId = Convert.ToInt32(dgvOrders.SelectedRows[0].Cells["№"].Value);
-            db.ExecuteNonQuery($"UPDATE Orders SET Status = N'Отменен' WHERE OrderID = {orderId}");
+            int id = Convert.ToInt32(dgvOrders.SelectedRows[0].Cells["№"].Value);
+            db.ExecuteNonQuery($"UPDATE Orders SET Status = N'Отменен' WHERE OrderID = {id}");
             LoadOrdersData();
         }
         #endregion
 
-        #region Навигация по боковой панели
+        #region НАВИГАЦИЯ И ИТОГИ
         private void panel3_Click(object sender, EventArgs e) => tabControl1.SelectedTab = tabAcc;
         private void panel4_Click(object sender, EventArgs e) { tabControl1.SelectedTab = tabCart; LoadCartData(); }
         private void panel5_Click(object sender, EventArgs e) { tabControl1.SelectedTab = tabOrders; LoadOrdersData(); }
         private void panel2_Click(object sender, EventArgs e) => this.Close();
-        #endregion
-
         private void profile_FormClosed(object sender, FormClosedEventArgs e) => new main().Show();
+
+        private void UpdateTotalSum()
+        {
+            decimal t = 0;
+            foreach (DataGridViewRow r in dgvCart.Rows)
+                if (r.Cells["Сумма"].Value != DBNull.Value) t += Convert.ToDecimal(r.Cells["Сумма"].Value);
+            lblTotal.Text = $"Итого: {t:N0} ₽";
+        }
+        #endregion
     }
 }
