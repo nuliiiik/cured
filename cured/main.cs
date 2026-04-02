@@ -14,13 +14,11 @@ namespace cured
         private DataBase db = new DataBase();
         private TableLayoutPanel[] tables = new TableLayoutPanel[3];
 
-        // Массивы для управления элементами фильтрации
         private ComboBox[] sortCombos = new ComboBox[3];
-        private ComboBox filterBrandMoto; // Специальный фильтр только для вкладки Мотоциклы
+        private ComboBox filterBrandMoto;
         private TextBox[] priceFromBoxes = new TextBox[3];
         private TextBox[] priceToBoxes = new TextBox[3];
 
-        // Флаг для предотвращения множественного открытия окон деталей
         private bool isDetailWindowOpen = false;
 
         #endregion
@@ -33,16 +31,12 @@ namespace cured
             ConfigureWindow();
         }
 
-        /// <summary>
-        /// Первичная настройка внешнего вида окна
-        /// </summary>
         private void ConfigureWindow()
         {
             this.Size = new Size(1750, 735);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.AutoScaleMode = AutoScaleMode.None;
 
-            // Настройка TabControl: скрываем заголовки вкладок для кастомной навигации
             tabControl1.Appearance = TabAppearance.FlatButtons;
             tabControl1.ItemSize = new Size(0, 1);
             tabControl1.SizeMode = TabSizeMode.Fixed;
@@ -52,34 +46,28 @@ namespace cured
         {
             UpdateProfileLabel();
 
-            // --- ПРИВЯЗКА НАВИГАЦИИ ---
-            label5.Click += Label5_Click; // Профиль / Вход
+            // Навигация
+            label5.Click += Label5_Click;
             label1.Click += (s, ev) => tabControl1.SelectedTab = tabMain;
             label2.Click += (s, ev) => tabControl1.SelectedTab = tabMotocycles;
             label3.Click += (s, ev) => tabControl1.SelectedTab = tabParts;
             label4.Click += (s, ev) => tabControl1.SelectedTab = tabContacts;
 
-            // --- ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА ВКЛАДОК ---
             InitMainTab();
             InitMotoTab();
             InitPartsTab();
             InitContactsTab();
 
-            FillBrands(); // Загрузка списка брендов из БД
+            FillBrands();
 
-            // Первичная загрузка данных во все таблицы
             RefreshAllTabs();
 
-            // Автоматическое обновление данных при переключении между вкладками
             tabControl1.SelectedIndexChanged += (s, ev) => {
                 int idx = tabControl1.SelectedIndex;
                 if (idx >= 0 && idx <= 2) LoadData(idx);
             };
         }
 
-        /// <summary>
-        /// Обновляет текст кнопки профиля (ФИО пользователя или "Войти")
-        /// </summary>
         private void UpdateProfileLabel()
         {
             if (acc_checked.acc_check)
@@ -97,7 +85,6 @@ namespace cured
             Panel pnl = CreateTopPanel(tabMain);
             CreateLabel(pnl, "Сортировка:", 20);
             sortCombos[0] = CreateSortCombo(pnl, 0);
-
             AddPriceFilters(pnl, 0, 250);
             SetupTable(tabMain, 0, pnl);
         }
@@ -122,19 +109,14 @@ namespace cured
             Panel pnl = CreateTopPanel(tabParts);
             CreateLabel(pnl, "Сортировка:", 20);
             sortCombos[2] = CreateSortCombo(pnl, 2);
-
             AddPriceFilters(pnl, 2, 250);
             SetupTable(tabParts, 2, pnl);
         }
 
-        /// <summary>
-        /// Создает текстовые поля для фильтрации по цене
-        /// </summary>
         private void AddPriceFilters(Panel pnl, int idx, int startX)
         {
             CreateLabel(pnl, "Цена от:", startX);
             priceFromBoxes[idx] = new TextBox { Location = new Point(startX + 60, 18), Size = new Size(80, 25) };
-
             CreateLabel(pnl, "до:", startX + 150);
             priceToBoxes[idx] = new TextBox { Location = new Point(startX + 180, 18), Size = new Size(80, 25) };
 
@@ -150,46 +132,61 @@ namespace cured
 
         #region РАБОТА С ДАННЫМИ (SQL & LOGIC)
 
-        /// <summary>
-        /// Основной метод загрузки данных из БД и создания карточек товаров
-        /// </summary>
         private void LoadData(int type)
         {
             if (tables[type] == null) return;
+
             tables[type].SuspendLayout();
             tables[type].Controls.Clear();
+            // Очищаем стили строк, чтобы таблица пересчиталась корректно
+            tables[type].RowStyles.Clear();
 
-            string filterSql = " WHERE Quantity > 0";
-
-            // Фильтр по бренду (применяется только для вкладки Мотоциклы)
-            if (type == 1 && filterBrandMoto?.SelectedIndex > 0)
-                filterSql += $" AND Brand = '{filterBrandMoto.SelectedItem}'";
-
-            // Парсинг цен для фильтрации
-            if (decimal.TryParse(priceFromBoxes[type]?.Text, out decimal pf)) filterSql += $" AND Price >= {pf}";
-            if (decimal.TryParse(priceToBoxes[type]?.Text, out decimal pt)) filterSql += $" AND Price <= {pt}";
+            decimal pf = 0;
+            decimal pt = 99999999;
+            decimal.TryParse(priceFromBoxes[type]?.Text, out pf);
+            if (!decimal.TryParse(priceToBoxes[type]?.Text, out pt)) pt = 99999999;
 
             string orderSql = GetOrderSql(type);
             string query = "";
 
-            if (type == 1) // Мотоциклы
-                query = "SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description, Quantity as Stock FROM Motorcycles" + filterSql + orderSql;
-            else if (type == 2) // Запчасти
-                query = "SELECT PartID as ID, PartName as Name, Price, ImageURL, 'part' as T, Brand as B, 0 as Year, Description, Quantity as Stock FROM Parts" + filterSql + orderSql;
-            else // Главная (Объединение таблиц)
+            if (type == 1) // МОТОЦИКЛЫ
+            {
+                string brandFilter = (filterBrandMoto?.SelectedIndex > 0) ? $" AND Brand = '{filterBrandMoto.SelectedItem}'" : "";
+                query = $@"SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, 
+                           Brand as B, Year, Description, Quantity as Stock 
+                           FROM Motorcycles 
+                           WHERE Quantity > 0 AND Price >= {pf} AND Price <= {pt} {brandFilter} {orderSql}";
+            }
+            else if (type == 2) // ЗАПЧАСТИ
+            {
+                query = $@"SELECT PartID as ID, PartName as Name, Price, ImageURL, 'part' as T, 
+                           'Запчасть' as B, 0 as Year, Description, Quantity as Stock 
+                           FROM Parts 
+                           WHERE Quantity > 0 AND Price >= {pf} AND Price <= {pt} {orderSql}";
+            }
+            else // ГЛАВНАЯ
+            {
                 query = $@"SELECT * FROM (
                             SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description, Quantity as Stock FROM Motorcycles
                             UNION ALL 
-                            SELECT PartID, PartName, Price, ImageURL, 'part', Brand, 0, Description, Quantity FROM Parts
-                          ) as Combined" + filterSql.Replace("Quantity", "Stock") + orderSql.Replace("Year", "ID");
+                            SELECT PartID, PartName, Price, ImageURL, 'part', 'Запчасть', 0, Description, Quantity FROM Parts
+                          ) as Combined 
+                          WHERE Stock > 0 AND Price >= {pf} AND Price <= {pt} 
+                          {orderSql.Replace("Year", "ID").Replace("PartID", "ID")}";
+            }
 
             try
             {
                 DataTable dt = db.ExecuteQuery(query);
                 foreach (DataRow r in dt.Rows)
+                {
                     tables[type].Controls.Add(CreateCard(r, type));
+                }
             }
-            catch (Exception ex) { MessageBox.Show("Ошибка при получении данных: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки (Вкладка {type}):\n{ex.Message}");
+            }
 
             tables[type].ResumeLayout();
         }
@@ -202,9 +199,6 @@ namespace cured
             return (type == 2) ? " ORDER BY PartID DESC" : " ORDER BY Year DESC";
         }
 
-        /// <summary>
-        /// Создание объекта карточки товара на основе строки из БД
-        /// </summary>
         private ProductCard CreateCard(DataRow r, int type)
         {
             int id = Convert.ToInt32(r["ID"]);
@@ -217,14 +211,13 @@ namespace cured
 
             LoadCardImage(card, r["ImageURL"].ToString(), r["B"].ToString());
 
-            // Логика открытия окна подробностей
             EventHandler open = (s, e) => {
                 if (isDetailWindowOpen) return;
                 isDetailWindowOpen = true;
                 using (ProductDetails pd = new ProductDetails(card.labelArticle.Text, card.labelName.Text, card.labelPrice.Text, card.labelDetails.Text, r["Description"].ToString(), card.pictureBox.Image, id, t))
                 {
                     pd.ShowDialog();
-                    RefreshAllTabs(); // Синхронизация количества во всех вкладках после закрытия окна
+                    RefreshAllTabs();
                 }
                 isDetailWindowOpen = false;
             };
@@ -247,6 +240,7 @@ namespace cured
         {
             try
             {
+                if (string.IsNullOrEmpty(url)) { card.pictureBox.Image = GetPlaceholder(brand); return; }
                 string path = url.TrimStart('/').Replace('/', '\\');
                 string fullPath = Path.Combine(Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\..\\")), path);
 
@@ -262,11 +256,15 @@ namespace cured
 
         private void FillBrands()
         {
-            DataTable dt = db.ExecuteQuery("SELECT DISTINCT Brand FROM Motorcycles");
-            filterBrandMoto.Items.Clear();
-            filterBrandMoto.Items.Add("Все марки");
-            foreach (DataRow r in dt.Rows) filterBrandMoto.Items.Add(r["Brand"].ToString());
-            filterBrandMoto.SelectedIndex = 0;
+            try
+            {
+                DataTable dt = db.ExecuteQuery("SELECT DISTINCT Brand FROM Motorcycles");
+                filterBrandMoto.Items.Clear();
+                filterBrandMoto.Items.Add("Все марки");
+                foreach (DataRow r in dt.Rows) filterBrandMoto.Items.Add(r["Brand"].ToString());
+                filterBrandMoto.SelectedIndex = 0;
+            }
+            catch { }
         }
 
         private ComboBox CreateSortCombo(Panel p, int idx)
@@ -287,8 +285,17 @@ namespace cured
         private void SetupTable(TabPage tab, int idx, Panel pnl)
         {
             Panel scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White };
-            tables[idx] = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 5 };
-            for (int i = 0; i < 5; i++) tables[idx].ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20f));
+            tables[idx] = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                ColumnCount = 5,
+                // Важно для корректного отображения множества строк:
+                GrowStyle = TableLayoutPanelGrowStyle.AddRows
+            };
+
+            for (int i = 0; i < 5; i++)
+                tables[idx].ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20f));
 
             scroll.Controls.Add(tables[idx]);
             tab.Controls.Add(scroll);
@@ -316,9 +323,7 @@ namespace cured
                        "• Адрес: г. Барнаул, ул. 80 Гвардейской дивизии, д. 41\n" +
                        "• Режим работы: ПН-ВС с 09:00 до 17:00\n\n" +
                        "• О НАС\n" +
-                       "Наш магазин мототехники специализируется на продаже оригинальных мотоциклов и запчастей с 2026 года. " +
-                       "За это время мы накопили бесценный опыт в сфере розничной торговли и профессионального подбора комплектующих.\n\n" +
-                       "Все товары проходят строгую проверку качества. Безопасность наших клиентов — главный приоритет.",
+                       "Наш магазин мототехники специализируется на продаже оригинальных мотоциклов и запчастей с 2026 года.",
                 Location = new Point(50, 50),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 14)
@@ -327,17 +332,15 @@ namespace cured
 
         #endregion
 
-        #region СОБЫТИЯ И ПЕРЕХОДЫ МЕЖДУ ФОРМАМИ
+        #region СОБЫТИЯ
 
         private void Label5_Click(object sender, EventArgs e)
         {
-            if (!acc_checked.acc_check) new login().Show();
-            else if (user.role == "admin") new admin().Show();
-            else new profile().Show();
-            this.Hide();
+            if (!acc_checked.acc_check) { new login().Show(); this.Hide(); }
+            else if (user.role == "admin") { new admin().Show(); this.Hide(); }
+            else { new profile().Show(); this.Hide(); }
         }
 
-        // Клик по иконке профиля дублирует клик по надписи
         private void pictureBox1_Click(object sender, EventArgs e) => Label5_Click(sender, e);
 
         private void main_FormClosed(object sender, FormClosedEventArgs e) => Application.Exit();
