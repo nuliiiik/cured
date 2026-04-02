@@ -17,9 +17,9 @@ namespace cured
     /// </summary>
     public partial class login : Form
     {
-        #region Инициализация
+        #region ИНИЦИАЛИЗАЦИЯ И ЗАГРУЗКА
 
-        // Подключение к нашей базе данных
+        // Подключение к нашей базе данных через вспомогательный класс
         DataBase database = new DataBase();
 
         public login()
@@ -27,32 +27,35 @@ namespace cured
             InitializeComponent();
         }
 
+        /// <summary>
+        /// Событие при загрузке формы: настройка полей ввода по умолчанию.
+        /// </summary>
         private void login_Load(object sender, EventArgs e)
         {
-            // Скрываем символы пароля при загрузке формы
+            // Скрываем символы пароля звездочками для безопасности
             textBox2.PasswordChar = '*';
-            // Устанавливаем начальный текст кнопки
+            // Устанавливаем начальный текст кнопки переключения видимости
             btnShowClosePass.Text = "Показать пароль";
         }
 
         #endregion
 
-        #region Логика отображения пароля
+        #region ЛОГИКА ОТОБРАЖЕНИЯ ПАРОЛЯ
 
         /// <summary>
-        /// Переключает видимость пароля в поле ввода.
+        /// Переключает режим видимости пароля (маскировка символов).
         /// </summary>
         private void btnShowClosePass_Click(object sender, EventArgs e)
         {
             if (textBox2.PasswordChar == '*')
             {
-                // Показываем пароль
-                textBox2.PasswordChar = '\0'; // '\0' означает отсутствие маскировки
+                // Убираем маскировку (показываем текст)
+                textBox2.PasswordChar = '\0';
                 btnShowClosePass.Text = "Скрыть пароль";
             }
             else
             {
-                // Скрываем пароль
+                // Возвращаем маскировку звездочками
                 textBox2.PasswordChar = '*';
                 btnShowClosePass.Text = "Показать пароль";
             }
@@ -60,7 +63,7 @@ namespace cured
 
         #endregion
 
-        #region Основная логика входа
+        #region ОСНОВНАЯ ЛОГИКА ВХОДА (АВТОРИЗАЦИЯ)
 
         /// <summary>
         /// Обработка нажатия кнопки "Войти".
@@ -68,14 +71,16 @@ namespace cured
         /// </summary>
         private void button1_Click(object sender, EventArgs e)
         {
+            // Считываем данные из текстовых полей
             string login_user = textBox1.Text;
             string password_user = textBox2.Text;
 
-            // Создаем адаптер и таблицу для хранения результата запроса
+            // Подготавливаем инструменты для работы с SQL
             SqlDataAdapter adapter = new SqlDataAdapter();
             DataTable table = new DataTable();
 
-            // SQL-запрос для получения полной информации о профиле при совпадении данных
+            // Формируем SQL-запрос для получения данных профиля
+            // Внимание: Данный метод подвержен SQL-инъекциям, в будущем лучше использовать параметры (Parameters.Add)
             string querystring = $"SELECT UserID, Login, FullName, Phone, Role FROM Users " +
                                  $"WHERE Login = '{login_user}' AND Password = '{password_user}'";
 
@@ -83,37 +88,49 @@ namespace cured
 
             try
             {
+                // Выполняем запрос и заполняем таблицу результатами
                 adapter.SelectCommand = command;
                 adapter.Fill(table);
 
-                // Если найдена ровно одна запись — данные верны
+                // Проверяем: если в таблице ровно одна строка — пользователь найден
                 if (table.Rows.Count == 1)
                 {
-                    // Сохраняем данные во временный статический класс 'user' для доступа из других форм
+                    // Сохраняем данные во временный статический класс 'user'. 
+                    // Это позволит нам знать, кто залогинен, на любой другой форме (например, в корзине).
                     user.id_user = Convert.ToInt32(table.Rows[0]["UserID"]);
                     user.login_user = table.Rows[0]["Login"].ToString();
                     user.full_name = table.Rows[0]["FullName"].ToString();
                     user.phone = table.Rows[0]["Phone"].ToString();
                     user.role = table.Rows[0]["Role"].ToString();
 
-                    // Флаг того, что проверка пройдена успешно
+                    // Ставим глобальную отметку успешного входа
                     acc_checked.acc_check = true;
 
                     MessageBox.Show($"Добро пожаловать, {user.full_name}!", "Успешно!",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                    // Переход на главную форму
-                    if (user.role == "admin") { new admin().Show(); this.Hide(); }
-                    else { new main().Show(); this.Hide(); }
+                    // Перенаправление в зависимости от роли пользователя (Админ или Обычный)
+                    if (user.role == "admin")
+                    {
+                        new admin().Show();
+                        this.Hide();
+                    }
+                    else
+                    {
+                        new main().Show();
+                        this.Hide();
+                    }
                 }
                 else
                 {
+                    // Если совпадений нет, выводим предупреждение
                     MessageBox.Show("Неверный логин или пароль. Попробуйте снова.", "Ошибка доступа",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
             catch (Exception ex)
             {
+                // Обработка непредвиденных ошибок (например, отсутствие связи с сервером БД)
                 MessageBox.Show("Ошибка при попытке входа: " + ex.Message, "Критическая ошибка",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -121,20 +138,23 @@ namespace cured
 
         #endregion
 
-        #region Удобство использования (Enter и Навигация)
+        #region УДОБСТВО И НАВИГАЦИЯ
 
         /// <summary>
-        /// Позволяет пользователю входить в систему, просто нажав Enter в поле пароля.
+        /// Позволяет совершить вход нажатием клавиши Enter прямо в поле пароля.
         /// </summary>
         private void textBox2_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter)
             {
-                button1.PerformClick(); // Имитируем клик по кнопке "Войти"
-                e.SuppressKeyPress = true; // Отключаем системный звук ошибки Enter
+                button1.PerformClick(); // Программно нажимаем кнопку "Войти"
+                e.SuppressKeyPress = true; // Отключаем стандартный "писк" Windows при нажатии Enter
             }
         }
 
+        /// <summary>
+        /// Дублирование логики Enter для кнопки входа (для фокуса на кнопке).
+        /// </summary>
         private void button1_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter)
@@ -145,7 +165,7 @@ namespace cured
         }
 
         /// <summary>
-        /// Переход на форму регистрации при нажатии на соответствующую надпись.
+        /// Переход на форму регистрации новых пользователей.
         /// </summary>
         private void label4_Click(object sender, EventArgs e)
         {
@@ -155,7 +175,7 @@ namespace cured
         }
 
         /// <summary>
-        /// Возврат в главное меню при закрытии окна логина.
+        /// Возврат в главное меню при закрытии окна авторизации.
         /// </summary>
         private void login_FormClosed(object sender, FormClosedEventArgs e)
         {

@@ -6,18 +6,24 @@ using System.Data.SqlClient;
 
 namespace cured
 {
+    /// <summary>
+    /// ФОРМА: РЕГИСТРАЦИЯ
+    /// </summary>
     public partial class registr : Form
     {
-        DataBase database = new DataBase();
+        private DataBase database = new DataBase();
 
         public registr()
         {
             InitializeComponent();
-            button1.Enabled = false;
+            button1.Enabled = false; // Кнопка заблокирована до принятия соглашения
         }
 
-        #region ОСНОВНАЯ ЛОГИКА РЕГИСТРАЦИИ
+        #region 1. ОСНОВНАЯ ЛОГИКА РЕГИСТРАЦИИ
 
+        /// <summary>
+        /// ОБРАБОТЧИК: Регистрация пользователя (button1)
+        /// </summary>
         private void button1_Click(object sender, EventArgs e)
         {
             string name_user = textBox1.Text.Trim();
@@ -25,28 +31,23 @@ namespace cured
             string password_user = textBox3.Text.Trim();
             string phone_user = maskedTextBox1.Text;
 
-            if (string.IsNullOrEmpty(name_user) ||
-                string.IsNullOrEmpty(login_user) ||
-                string.IsNullOrEmpty(password_user))
+            // Валидация заполнения полей
+            if (string.IsNullOrEmpty(name_user) || string.IsNullOrEmpty(login_user) || string.IsNullOrEmpty(password_user))
             {
-                MessageBox.Show("Пожалуйста, заполните все поля формы!", "Внимание",
-                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Пожалуйста, заполните все поля формы!", "Внимание", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // ПРОВЕРКИ ДЛИНЫ И ТЕЛЕФОНА
-            if (login_user.Length < 4) { MessageBox.Show("Логин должен содержать минимум 4 символа!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-            if (password_user.Length < 4) { MessageBox.Show("Пароль должен содержать минимум 4 символа!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-            if (!maskedTextBox1.MaskFull) { MessageBox.Show("Введите номер телефона полностью!", "Внимание", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            // Проверки безопасности и корректности данных
+            if (login_user.Length < 4) { MessageBox.Show("Логин должен содержать минимум 4 символа!", "Ошибка"); return; }
+            if (password_user.Length < 4) { MessageBox.Show("Пароль должен содержать минимум 4 символа!", "Ошибка"); return; }
+            if (!maskedTextBox1.MaskFull) { MessageBox.Show("Введите номер телефона полностью!", "Внимание"); return; }
 
-            // ПРОВЕРКА НА СУЩЕСТВУЮЩИЙ ЛОГИН (ВАЖНО)
-            if (checkuser())
-            {
-                // Если checkuser вернул true, значит логин занят, выходим из метода
-                return;
-            }
+            // Проверка на дубликат логина
+            if (checkuser()) return;
 
-            string querystring = "insert into Users(FullName, Login, Password, Phone) values(@name, @login, @pass, @phone)";
+            // SQL запрос на вставку данных
+            string querystring = "INSERT INTO Users(FullName, Login, Password, Phone) VALUES(@name, @login, @pass, @phone)";
             SqlCommand command = new SqlCommand(querystring, database.getConnection());
             command.Parameters.AddWithValue("@name", name_user);
             command.Parameters.AddWithValue("@login", login_user);
@@ -68,6 +69,9 @@ namespace cured
             finally { database.closeConnection(); }
         }
 
+        /// <summary>
+        /// МЕТОД: Проверка существования логина в БД
+        /// </summary>
         private Boolean checkuser()
         {
             string query = "SELECT UserID FROM Users WHERE Login = @login";
@@ -88,57 +92,85 @@ namespace cured
 
         #endregion
 
-        #region СОГЛАСИЕ НА ОБРАБОТКУ ДАННЫХ
-        private void checkAgreement_CheckedChanged(object sender, EventArgs e) { button1.Enabled = checkAgreement.Checked; }
+        #region 2. СОГЛАСИЕ НА ОБРАБОТКУ ДАННЫХ
 
+        /// <summary>
+        /// ОБРАБОТЧИК: Чекбокс согласия
+        /// </summary>
+        private void checkAgreement_CheckedChanged(object sender, EventArgs e)
+        {
+            button1.Enabled = checkAgreement.Checked;
+        }
+
+        /// <summary>
+        /// ОБРАБОТЧИК: Просмотр деталей политики (labelDetails)
+        /// </summary>
         private void labelDetails_Click(object sender, EventArgs e)
         {
             string title = "Политика обработки персональных данных";
-            string info = "Настоящим подтверждаю свое согласие на обработку моих персональных данных 'Магазин мототехники' на следующих условиях:\n\n" +
-                          "1. ПЕРЕЧЕНЬ СОБИРАЕМЫХ ДАННЫХ:\n" +
-                          "• Фамилия, Имя, Отчество (ФИО);\n" +
-                          "• Контактный номер телефона;\n" +
-                          "• Данные об истории заказов (состав корзины, дата покупки).\n\n" +
-                          "2. ЦЕЛИ ОБРАБОТКИ:\n" +
-                          "• Создание и управление личным кабинетом пользователя;\n" +
-                          "• Идентификация стороны в рамках заказов и договоров;\n" +
-                          "• Связь с пользователем для подтверждения наличия товара и уточнения деталей доставки;\n" +
-                          "• Предоставление технической поддержки.\n\n" +
-                          "3. ЗАЩИТА И ХРАНЕНИЕ:\n" +
-                          "• Мы обязуемся не передавать ваши данные третьим лицам (кроме случаев, предусмотренных законом);\n" +
-                          "• Пользователь имеет право запросить удаление аккаунта и всех связанных данных.\n\n" +
-                          "Нажимая галочку и продолжая регистрацию, вы принимаете данные условия в полном объеме.";
+            string info = "Настоящим подтверждаю свое согласие на обработку моих данных...\n\n" +
+                          "1. ПЕРЕЧЕНЬ: ФИО, телефон, история заказов.\n" +
+                          "2. ЦЕЛИ: Управление личным кабинетом, связь по заказам.\n" +
+                          "3. ЗАЩИТА: Данные не передаются третьим лицам.";
             MessageBox.Show(info, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
         #endregion
 
-        #region Логика отображения пароля
+        #region 3. ПАРОЛЬ (ВИДИМОСТЬ)
 
         /// <summary>
-        /// Переключает видимость пароля в поле ввода.
+        /// ОБРАБОТЧИК: Показать/Скрыть пароль (btnShowClosePass)
         /// </summary>
         private void btnShowClosePass_Click(object sender, EventArgs e)
         {
             if (textBox3.PasswordChar == '*')
             {
-                // Показываем пароль
-                textBox3.PasswordChar = '\0'; // '\0' означает отсутствие маскировки
+                textBox3.PasswordChar = '\0'; // Показать
                 btnShowClosePass.Text = "Скрыть пароль";
             }
             else
             {
-                // Скрываем пароль
-                textBox3.PasswordChar = '*';
+                textBox3.PasswordChar = '*'; // Скрыть
                 btnShowClosePass.Text = "Показать пароль";
             }
         }
 
         #endregion
 
-        #region НАВИГАЦИЯ
-        private void label7_Click(object sender, EventArgs e) { login f = new login(); f.Show(); this.Hide(); }
-        private void registr_FormClosed(object sender, FormClosedEventArgs e) { main f = new main(); f.Show(); this.Hide(); }
-        private void maskedTextBox1_KeyDown(object sender, KeyEventArgs e) { if (e.KeyCode == Keys.Enter && button1.Enabled) { button1.PerformClick(); e.SuppressKeyPress = true; } }
+        #region 4. НАВИГАЦИЯ
+
+        /// <summary>
+        /// ОБРАБОТЧИК: Ссылка "Войти" (label7)
+        /// </summary>
+        private void label7_Click(object sender, EventArgs e)
+        {
+            login f = new login();
+            f.Show();
+            this.Hide();
+        }
+
+        /// <summary>
+        /// ОБРАБОТЧИК: Закрытие формы регистрации
+        /// </summary>
+        private void registr_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            main f = new main();
+            f.Show();
+        }
+
+        /// <summary>
+        /// ОБРАБОТЧИК: Нажатие Enter в поле телефона
+        /// </summary>
+        private void maskedTextBox1_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter && button1.Enabled)
+            {
+                button1.PerformClick();
+                e.SuppressKeyPress = true;
+            }
+        }
+
         #endregion
     }
 }
