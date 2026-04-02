@@ -131,14 +131,12 @@ namespace cured
         #endregion
 
         #region РАБОТА С ДАННЫМИ (SQL & LOGIC)
-
         private void LoadData(int type)
         {
             if (tables[type] == null) return;
 
             tables[type].SuspendLayout();
             tables[type].Controls.Clear();
-            // Очищаем стили строк, чтобы таблица пересчиталась корректно
             tables[type].RowStyles.Clear();
 
             decimal pf = 0;
@@ -151,28 +149,31 @@ namespace cured
 
             if (type == 1) // МОТОЦИКЛЫ
             {
+                // ИСПРАВЛЕНО: Теперь берем данные именно из таблицы Motorcycles
                 string brandFilter = (filterBrandMoto?.SelectedIndex > 0) ? $" AND Brand = '{filterBrandMoto.SelectedItem}'" : "";
                 query = $@"SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, 
-                           Brand as B, Year, Description, Quantity as Stock 
-                           FROM Motorcycles 
-                           WHERE Quantity > 0 AND Price >= {pf} AND Price <= {pt} {brandFilter} {orderSql}";
+                   Brand as B, Year, Description, Quantity as Stock 
+                   FROM Motorcycles 
+                   WHERE Quantity > 0 AND Price >= {pf} AND Price <= {pt} {brandFilter} {orderSql}";
             }
             else if (type == 2) // ЗАПЧАСТИ
             {
+                // ИСПРАВЛЕНО: Убеждаемся, что здесь только запчасти
                 query = $@"SELECT PartID as ID, PartName as Name, Price, ImageURL, 'part' as T, 
-                           'Запчасть' as B, 0 as Year, Description, Quantity as Stock 
-                           FROM Parts 
-                           WHERE Quantity > 0 AND Price >= {pf} AND Price <= {pt} {orderSql}";
+                   Brand as B, 0 as Year, Description, Quantity as Stock 
+                   FROM Parts 
+                   WHERE Quantity > 0 AND Price >= {pf} AND Price <= {pt} {orderSql}";
             }
-            else // ГЛАВНАЯ
+            else // ГЛАВНАЯ (Всё вперемешку)
             {
+                // ИСПРАВЛЕНО: Соединяем обе таблицы через UNION ALL
                 query = $@"SELECT * FROM (
-                            SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description, Quantity as Stock FROM Motorcycles
-                            UNION ALL 
-                            SELECT PartID, PartName, Price, ImageURL, 'part', 'Запчасть', 0, Description, Quantity FROM Parts
-                          ) as Combined 
-                          WHERE Stock > 0 AND Price >= {pf} AND Price <= {pt} 
-                          {orderSql.Replace("Year", "ID").Replace("PartID", "ID")}";
+                    SELECT MotorcycleID as ID, Brand + ' ' + Model as Name, Price, ImageURL, 'moto' as T, Brand as B, Year, Description, Quantity as Stock FROM Motorcycles
+                    UNION ALL 
+                    SELECT PartID, PartName, Price, ImageURL, 'part', Brand, 0, Description, Quantity FROM Parts
+                  ) as Combined 
+                  WHERE Stock > 0 AND Price >= {pf} AND Price <= {pt} 
+                  {orderSql.Replace("Year", "ID").Replace("PartID", "ID")}";
             }
 
             try
@@ -207,9 +208,16 @@ namespace cured
 
             card.labelName.Text = r["Name"].ToString();
             card.labelPrice.Text = $"{Convert.ToDecimal(r["Price"]):N0} ₽";
-            card.labelDetails.Text = r["B"].ToString() + (t == "moto" ? $", {r["Year"]} г." : "");
 
-            LoadCardImage(card, r["ImageURL"].ToString(), r["B"].ToString());
+            // Берем значение 'B', которое теперь реально приходит из БД
+            string brandValue = r["B"].ToString();
+
+            if (t == "moto")
+                card.labelDetails.Text = $"{brandValue}, {r["Year"]} г.";
+            else
+                card.labelDetails.Text = $"Производитель: {brandValue}";
+
+            LoadCardImage(card, r["ImageURL"].ToString(), brandValue);
 
             EventHandler open = (s, e) => {
                 if (isDetailWindowOpen) return;
@@ -338,7 +346,7 @@ namespace cured
         {
             if (!acc_checked.acc_check) { new login().Show(); this.Hide(); }
             else if (user.role == "admin") { new admin().Show(); this.Hide(); }
-            else { new main().Show(); this.Hide(); }
+            else { new profile().Show(); this.Hide(); }
         }
 
         private void pictureBox1_Click(object sender, EventArgs e) => Label5_Click(sender, e);

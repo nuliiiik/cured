@@ -157,16 +157,17 @@ namespace cured
             }
             catch (Exception ex) { MessageBox.Show("Ошибка при чтении данных: " + ex.Message); }
         }
-
         private void ReplaceStatusWithCombo()
         {
             DataGridViewComboBoxColumn combo = new DataGridViewComboBoxColumn
             {
+                Name = "Status", // КРИТИЧНО: Добавьте это свойство
                 HeaderText = "Статус исполнения",
                 DataPropertyName = "Status",
                 FlatStyle = FlatStyle.Flat
             };
             combo.Items.AddRange("Новый", "В обработке", "Завершен", "Отменен");
+
             int idx = dgvAdmin.Columns["Status"].Index;
             dgvAdmin.Columns.RemoveAt(idx);
             dgvAdmin.Columns.Insert(idx, combo);
@@ -184,16 +185,43 @@ namespace cured
             foreach (DataGridViewColumn col in dgvAdmin.Columns)
                 if (dict.ContainsKey(col.Name)) col.HeaderText = dict[col.Name];
         }
-
         private void btnSave_Click(object sender, EventArgs e)
         {
+            string currentTable = cbTables.SelectedValue?.ToString();
+
+            if (string.IsNullOrEmpty(currentTable)) return;
+
             try
             {
                 dgvAdmin.EndEdit();
-                adapter.Update(ds, cbTables.SelectedValue.ToString());
-                MessageBox.Show("Все изменения успешно применены в базе данных!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                if (currentTable == "Orders")
+                {
+                    foreach (DataGridViewRow row in dgvAdmin.Rows)
+                    {
+                        // Проверяем ID и наличие значения в ячейке Status
+                        if (row.Cells["OrderID"].Value != null && row.Cells["Status"].Value != null)
+                        {
+                            int orderId = Convert.ToInt32(row.Cells["OrderID"].Value);
+                            string status = row.Cells["Status"].Value.ToString();
+
+                            // Используем N перед строкой для поддержки русского языка
+                            db.ExecuteNonQuery($"UPDATE Orders SET Status = N'{status}' WHERE OrderID = {orderId}");
+                        }
+                    }
+                    MessageBox.Show("Статусы заказов успешно обновлены!", "Успех");
+                }
+                else
+                {
+                    // Для обычных таблиц (Motorcycles, Parts, Users) оставляем стандартный метод
+                    adapter.Update(ds, currentTable);
+                    MessageBox.Show("Изменения сохранены!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
-            catch (Exception ex) { MessageBox.Show("Ошибка сохранения изменений: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при сохранении: " + ex.Message);
+            }
         }
 
         private void btnDelete_Click(object sender, EventArgs e)

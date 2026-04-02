@@ -5,23 +5,18 @@ using System.Windows.Forms;
 
 namespace cured
 {
-    /// <summary>
-    /// Интерактивная карточка товара. 
-    /// Умеет самостоятельно работать с корзиной и проверять остатки.
-    /// </summary>
     public class ProductCard : UserControl
     {
-        #region Элементы управления (UI)
+        #region Элементы UI
         public PictureBox pictureBox;
         public Label labelName, labelPrice, labelDetails, labelArticle;
-
         private Panel cartPanel;
         private Button btnQuickAdd;
         private Label lblQty;
         private Button btnPlus, btnMinus;
         #endregion
 
-        #region Данные товара
+        #region Данные
         private int productId;
         private string productType;
         private int currentStock;
@@ -36,13 +31,60 @@ namespace cured
 
             InitializeComponentStyle();
             InitializeProductData();
+            LoadInfoFromDB(); // ЗАГРУЗКА ДАННЫХ
             InitializeCartUI();
-
-            // Начальная проверка: есть ли этот товар уже в корзине у пользователя?
             CheckInitialCartStatus();
         }
+        private void LoadInfoFromDB()
+        {
+            string table = (productType == "moto") ? "Motorcycles" : "Parts";
+            string idCol = (productType == "moto") ? "MotorcycleID" : "PartID";
 
-        #region Настройка внешнего вида
+            DataTable dt = db.ExecuteQuery($"SELECT * FROM {table} WHERE {idCol} = {productId}");
+
+            if (dt.Rows.Count > 0)
+            {
+                DataRow row = dt.Rows[0];
+
+                // 1. Достаем чистые данные из колонок (как в вашей БД на скрине)
+                string brandFromDB = row["Brand"]?.ToString().Trim() ?? "";
+                string partNameFromDB = (productType == "moto") ? row["Model"]?.ToString().Trim() : row["PartName"]?.ToString().Trim();
+                string forModels = (productType == "moto") ? row["Year"]?.ToString() : row["ForModels"]?.ToString().Trim();
+
+                // 2. ФОРМИРУЕМ НАЗВАНИЕ (Здесь исправлена ошибка "Запчасть")
+                // Если бренд есть, пишем "Бренд Название", если нет - только "Название"
+                if (!string.IsNullOrEmpty(brandFromDB))
+                {
+                    labelName.Text = $"{brandFromDB} {partNameFromDB}";
+                }
+                else
+                {
+                    labelName.Text = partNameFromDB;
+                }
+
+                // 3. ФОРМИРУЕМ ДЕТАЛИ (Нижняя строчка)
+                if (productType == "moto")
+                {
+                    labelDetails.Text = $"Производитель: {brandFromDB} | {forModels} г.";
+                }
+                else
+                {
+                    // Для запчастей пишем Бренд и для каких моделей
+                    labelDetails.Text = $"Бренд: {brandFromDB} ({forModels})";
+                }
+
+                // 4. Цена и картинка
+                labelPrice.Text = $"{Convert.ToDecimal(row["Price"]):N0} ₽";
+
+                try
+                {
+                    string path = row["ImageURL"]?.ToString();
+                    if (!string.IsNullOrEmpty(path))
+                        pictureBox.Image = Image.FromFile(Application.StartupPath + path);
+                }
+                catch { /* игнорируем ошибку фото */ }
+            }
+        }
 
         private void InitializeComponentStyle()
         {
@@ -50,72 +92,58 @@ namespace cured
             this.BorderStyle = BorderStyle.FixedSingle;
             this.BackColor = Color.White;
             this.Margin = new Padding(10);
-            this.Cursor = Cursors.Default;
         }
 
         private void InitializeProductData()
         {
-            // Картинка товара
-            pictureBox = new PictureBox { Size = new Size(200, 150), Location = new Point(10, 10), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.WhiteSmoke, Cursor = Cursors.Hand };
+            pictureBox = new PictureBox { Size = new Size(200, 140), Location = new Point(10, 10), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.WhiteSmoke, Cursor = Cursors.Hand };
 
-            // Название
-            labelName = new Label { Location = new Point(10, 165), Size = new Size(200, 35), Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
+            // Увеличили высоту labelName, чтобы влезло и название, и бренд
+            labelName = new Label { Location = new Point(10, 155), Size = new Size(200, 40), Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
 
-            // Артикул (М - мотоцикл, Д - деталь/запчасть)
             string prefix = (productType == "moto") ? "М" : "Д";
-            labelArticle = new Label { Location = new Point(10, 200), Size = new Size(200, 15), Text = $"Артикул: {prefix}{productId}", Font = new Font("Segoe UI", 7), ForeColor = Color.Gray, TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
+            labelArticle = new Label { Location = new Point(10, 195), Size = new Size(200, 15), Text = $"Артикул: {prefix}{productId}", Font = new Font("Segoe UI", 7), ForeColor = Color.Gray, TextAlign = ContentAlignment.MiddleCenter };
 
-            // Цена
-            labelPrice = new Label { Location = new Point(10, 215), Size = new Size(200, 25), Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
+            labelPrice = new Label { Location = new Point(10, 210), Size = new Size(200, 25), Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter };
 
-            // Доп. инфо (Бренд, год)
-            labelDetails = new Label { Location = new Point(10, 240), Size = new Size(200, 20), Font = new Font("Segoe UI", 7), ForeColor = SystemColors.ButtonShadow, TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
+            labelDetails = new Label
+            {
+                Location = new Point(10, 235),
+                Size = new Size(200, 30),
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.DimGray,
+                TextAlign = ContentAlignment.TopCenter
+            };
 
-            // Подписываем элементы на клик для открытия окна деталей в main.cs
             pictureBox.Click += (s, e) => OpenDetailsWindow();
             labelName.Click += (s, e) => OpenDetailsWindow();
-            labelPrice.Click += (s, e) => OpenDetailsWindow();
-            labelArticle.Click += (s, e) => OpenDetailsWindow();
             labelDetails.Click += (s, e) => OpenDetailsWindow();
 
             this.Controls.AddRange(new Control[] { pictureBox, labelName, labelArticle, labelPrice, labelDetails });
         }
 
-        #endregion
-
-        #region Логика Корзины
-
         private void InitializeCartUI()
         {
-            cartPanel = new Panel { Location = new Point(10, 265), Size = new Size(200, 45), BackColor = Color.Transparent };
-
-            // Кнопка "Купить"
+            cartPanel = new Panel { Location = new Point(10, 265), Size = new Size(200, 45) };
             btnQuickAdd = new Button { Size = new Size(180, 35), Location = new Point(10, 5), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnQuickAdd.FlatAppearance.BorderSize = 0;
 
             if (currentStock > 0)
             {
                 btnQuickAdd.Text = "🛒 КУПИТЬ";
                 btnQuickAdd.BackColor = Color.DarkRed;
                 btnQuickAdd.ForeColor = Color.White;
-                btnQuickAdd.Click += BtnQuickAdd_Click;
+                btnQuickAdd.Click += (s, e) => { if (acc_checked.acc_check) { UpdateCartQty(1); ToggleCartButtons(true); } else MessageBox.Show("Войдите!"); };
             }
             else
             {
                 btnQuickAdd.Text = "НЕТ В НАЛИЧИИ";
-                btnQuickAdd.BackColor = SystemColors.ButtonShadow;
-                btnQuickAdd.ForeColor = Color.White;
+                btnQuickAdd.BackColor = Color.Silver;
                 btnQuickAdd.Enabled = false;
             }
 
-            // Элементы управления количеством (скрыты по умолчанию)
-            btnMinus = new Button { Size = new Size(35, 35), Location = new Point(10, 5), Text = "−", FlatStyle = FlatStyle.Flat, BackColor = SystemColors.ButtonShadow, ForeColor = Color.White, Visible = false, Cursor = Cursors.Hand };
-            btnMinus.FlatAppearance.BorderSize = 0;
-
-            lblQty = new Label { Size = new Size(110, 35), Location = new Point(45, 5), Text = "1", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Color.DarkRed, Visible = false };
-
-            btnPlus = new Button { Size = new Size(35, 35), Location = new Point(155, 5), Text = "+", FlatStyle = FlatStyle.Flat, BackColor = SystemColors.ButtonShadow, ForeColor = Color.White, Visible = false, Cursor = Cursors.Hand };
-            btnPlus.FlatAppearance.BorderSize = 0;
+            btnMinus = new Button { Size = new Size(35, 35), Location = new Point(10, 5), Text = "−", Visible = false, FlatStyle = FlatStyle.Flat };
+            lblQty = new Label { Size = new Size(110, 35), Location = new Point(45, 5), TextAlign = ContentAlignment.MiddleCenter, Visible = false, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+            btnPlus = new Button { Size = new Size(35, 35), Location = new Point(155, 5), Text = "+", Visible = false, FlatStyle = FlatStyle.Flat };
 
             btnPlus.Click += (s, e) => UpdateCartQty(1);
             btnMinus.Click += (s, e) => UpdateCartQty(-1);
@@ -124,11 +152,27 @@ namespace cured
             this.Controls.Add(cartPanel);
         }
 
-        private void BtnQuickAdd_Click(object sender, EventArgs e)
+        private void UpdateCartQty(int change)
         {
-            if (!acc_checked.acc_check) { MessageBox.Show("Для покупки необходимо войти в аккаунт."); return; }
-            UpdateCartQty(1);
-            ToggleCartButtons(true);
+            if (!acc_checked.acc_check) return;
+            string col = (productType == "moto") ? "MotorcycleID" : "PartID";
+            DataTable dt = db.ExecuteQuery($"SELECT Quantity FROM Cart WHERE UserID = {user.id_user} AND {col} = {productId}");
+            int inCart = (dt.Rows.Count > 0) ? Convert.ToInt32(dt.Rows[0]["Quantity"]) : 0;
+            int newQty = inCart + change;
+
+            if (newQty > currentStock) { MessageBox.Show("Превышен остаток!"); return; }
+
+            if (newQty <= 0)
+            {
+                db.ExecuteNonQuery($"DELETE FROM Cart WHERE UserID = {user.id_user} AND {col} = {productId}");
+                ToggleCartButtons(false);
+            }
+            else
+            {
+                if (inCart == 0) db.ExecuteNonQuery($"INSERT INTO Cart (UserID, {col}, Quantity) VALUES ({user.id_user}, {productId}, 1)");
+                else db.ExecuteNonQuery($"UPDATE Cart SET Quantity = {newQty} WHERE UserID = {user.id_user} AND {col} = {productId}");
+                lblQty.Text = newQty.ToString();
+            }
         }
 
         private void ToggleCartButtons(bool inCart)
@@ -139,56 +183,14 @@ namespace cured
             btnPlus.Visible = inCart;
         }
 
-        /// <summary>
-        /// Обновляет количество товара в БД (таблица Cart) и в интерфейсе карточки.
-        /// </summary>
-        private void UpdateCartQty(int change)
-        {
-            string col = (productType == "moto") ? "MotorcycleID" : "PartID";
-            DataTable dt = db.ExecuteQuery($"SELECT Quantity FROM Cart WHERE UserID = {user.id_user} AND {col} = {productId}");
-            int currentInCart = (dt.Rows.Count > 0) ? Convert.ToInt32(dt.Rows[0]["Quantity"]) : 0;
-
-            int newQty = currentInCart + change;
-
-            // Проверка на наличие на складе
-            if (newQty > currentStock)
-            {
-                MessageBox.Show($"Извините, на складе осталось только {currentStock} шт.", "Ограничение", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            if (newQty <= 0)
-            {
-                db.ExecuteNonQuery($"DELETE FROM Cart WHERE UserID = {user.id_user} AND {col} = {productId}");
-                ToggleCartButtons(false);
-            }
-            else
-            {
-                if (currentInCart == 0)
-                    db.ExecuteNonQuery($"INSERT INTO Cart (UserID, {col}, Quantity) VALUES ({user.id_user}, {productId}, 1)");
-                else
-                    db.ExecuteNonQuery($"UPDATE Cart SET Quantity = {newQty} WHERE UserID = {user.id_user} AND {col} = {productId}");
-
-                lblQty.Text = newQty.ToString();
-            }
-        }
-
         private void CheckInitialCartStatus()
         {
             if (!acc_checked.acc_check || currentStock <= 0) return;
             string col = (productType == "moto") ? "MotorcycleID" : "PartID";
             DataTable dt = db.ExecuteQuery($"SELECT Quantity FROM Cart WHERE UserID = {user.id_user} AND {col} = {productId}");
-            if (dt.Rows.Count > 0)
-            {
-                lblQty.Text = dt.Rows[0]["Quantity"].ToString();
-                ToggleCartButtons(true);
-            }
+            if (dt.Rows.Count > 0) { lblQty.Text = dt.Rows[0]["Quantity"].ToString(); ToggleCartButtons(true); }
         }
 
-        #endregion
-
         private void OpenDetailsWindow() => base.OnClick(EventArgs.Empty);
-
-        public void PerformCardClick() => base.OnClick(EventArgs.Empty);
     }
 }
