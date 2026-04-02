@@ -211,27 +211,58 @@ namespace cured
                 LoadCartData();
             }
         }
-
         private void btnAddOrder_Click(object sender, EventArgs e)
         {
             if (dgvCart.Rows.Count == 0) return;
-            if (!maskedTextBox1.MaskFull) { MessageBox.Show("Укажите номер телефона!"); return; }
+
+            // Проверяем, заполнен ли телефон (берем из maskedTextBox1, куда он загружается из профиля)
+            string userPhone = maskedTextBox1.Text;
+            if (!maskedTextBox1.MaskFull || string.IsNullOrWhiteSpace(userPhone.Replace("(", "").Replace(")", "").Replace("-", "").Replace("_", "").Trim()))
+            {
+                MessageBox.Show("Укажите номер телефона в профиле для оформления заказа!");
+                return;
+            }
 
             decimal total = 0;
             foreach (DataGridViewRow row in dgvCart.Rows) total += Convert.ToDecimal(row.Cells["Сумма"].Value);
 
+            // 1. Создаем запись о заказе
             string q = $@"INSERT INTO Orders (UserID, OrderDate, TotalAmount, Status, Phone) 
-                        VALUES ({user.id_user}, GETDATE(), {total.ToString().Replace(',', '.')}, N'Новый', '{maskedTextBox1.Text}'); SELECT SCOPE_IDENTITY();";
+                VALUES ({user.id_user}, GETDATE(), {total.ToString().Replace(',', '.')}, N'Новый', '{userPhone}'); SELECT SCOPE_IDENTITY();";
             int orderId = Convert.ToInt32(db.ExecuteScalar(q));
 
+            // 2. Переносим товары из корзины в детали заказа и УМЕНЬШАЕМ остаток на складе
             foreach (DataGridViewRow row in dgvCart.Rows)
             {
                 string mid = row.Cells["MotorcycleID"].Value == DBNull.Value ? "NULL" : row.Cells["MotorcycleID"].Value.ToString();
                 string pid = row.Cells["PartID"].Value == DBNull.Value ? "NULL" : row.Cells["PartID"].Value.ToString();
-                db.ExecuteNonQuery($"INSERT INTO OrderItems (OrderID, MotorcycleID, PartID, Quantity, Price) VALUES ({orderId}, {mid}, {pid}, {row.Cells["Кол-во"].Value}, {row.Cells["Цена"].Value.ToString().Replace(',', '.')})");
+                int qtyOrdered = Convert.ToInt32(row.Cells["Кол-во"].Value);
+                decimal price = Convert.ToDecimal(row.Cells["Цена"].Value);
+
+                // Сохраняем в историю заказа
+                db.ExecuteNonQuery($"INSERT INTO OrderItems (OrderID, MotorcycleID, PartID, Quantity, Price) VALUES ({orderId}, {mid}, {pid}, {qtyOrdered}, {price.ToString().Replace(',', '.')})");
+
+                // СПИСАНИЕ СО СКЛАДА
+                if (mid != "NULL")
+                {
+                    // Уменьшаем количество в таблице мотоциклов
+                    db.ExecuteNonQuery($"UPDATE Motorcycles SET Quantity = Quantity - {qtyOrdered} WHERE MotorcycleID = {mid}");
+                }
+                else if (pid != "NULL")
+                {
+                    // Уменьшаем количество в таблице запчастей
+                    db.ExecuteNonQuery($"UPDATE Parts SET Quantity = Quantity - {qtyOrdered} WHERE PartID = {pid}");
+                }
             }
+
+            // 3. Очищаем корзину пользователя
             db.ExecuteNonQuery($"DELETE FROM Cart WHERE UserID = {user.id_user}");
-            MessageBox.Show("Заказ успешно оформлен!");
+
+            // 4. Показываем обновленное сообщение
+            MessageBox.Show($"Заказ успешно оформлен!\nВ ближайшее время мы свяжемся с вами по номеру: {userPhone}",
+                            "Заказ принят", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            // Обновляем таблицы на форме
             LoadCartData();
             LoadOrdersData();
         }

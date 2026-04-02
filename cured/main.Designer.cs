@@ -152,7 +152,7 @@
             this.tabControl1.Controls.Add(this.tabParts);
             this.tabControl1.Controls.Add(this.tabContacts);
             this.tabControl1.Location = new System.Drawing.Point(10, 101);
-            this.tabControl1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabControl1.Margin = new System.Windows.Forms.Padding(2);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.Size = new System.Drawing.Size(1406, 588);
@@ -161,9 +161,9 @@
             // tabMain
             // 
             this.tabMain.Location = new System.Drawing.Point(4, 22);
-            this.tabMain.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabMain.Margin = new System.Windows.Forms.Padding(2);
             this.tabMain.Name = "tabMain";
-            this.tabMain.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabMain.Padding = new System.Windows.Forms.Padding(2);
             this.tabMain.Size = new System.Drawing.Size(1398, 562);
             this.tabMain.TabIndex = 0;
             this.tabMain.Text = "Main";
@@ -172,9 +172,9 @@
             // tabMotocycles
             // 
             this.tabMotocycles.Location = new System.Drawing.Point(4, 22);
-            this.tabMotocycles.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabMotocycles.Margin = new System.Windows.Forms.Padding(2);
             this.tabMotocycles.Name = "tabMotocycles";
-            this.tabMotocycles.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabMotocycles.Padding = new System.Windows.Forms.Padding(2);
             this.tabMotocycles.Size = new System.Drawing.Size(1398, 562);
             this.tabMotocycles.TabIndex = 1;
             this.tabMotocycles.Text = "Motocycles";
@@ -183,7 +183,7 @@
             // tabParts
             // 
             this.tabParts.Location = new System.Drawing.Point(4, 22);
-            this.tabParts.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabParts.Margin = new System.Windows.Forms.Padding(2);
             this.tabParts.Name = "tabParts";
             this.tabParts.Size = new System.Drawing.Size(1398, 562);
             this.tabParts.TabIndex = 2;
@@ -193,7 +193,7 @@
             // tabContacts
             // 
             this.tabContacts.Location = new System.Drawing.Point(4, 22);
-            this.tabContacts.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabContacts.Margin = new System.Windows.Forms.Padding(2);
             this.tabContacts.Name = "tabContacts";
             this.tabContacts.Size = new System.Drawing.Size(1398, 562);
             this.tabContacts.TabIndex = 3;

@@ -4,32 +4,28 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Data.SqlClient;
 using System.Collections.Generic;
-using System.Linq; // Обязательно для .ToList()
+using System.Linq;
 
 namespace cured
 {
     public partial class admin : Form
     {
-        #region Переменные и инициализация
-
         private DataGridView dgvAdmin;
         private ComboBox cbTables;
-        private Button btnSave, btnDelete, btnBack;
+        private Button btnSave, btnDelete, btnBack, btnAddNewProduct;
         private Label lblTitle;
 
         DataBase db = new DataBase();
         SqlDataAdapter adapter;
         DataSet ds;
 
-        // Словарь сопоставления (Английское имя в БД -> Русское имя для юзера)
+        // Русские названия категорий
         private Dictionary<string, string> tableMapping = new Dictionary<string, string>
         {
-            { "Users", "Пользователи" },
-            { "Motorcycles", "Мотоциклы" },
-            { "Parts", "Запчасти" },
-            { "Orders", "Заказы" },
-            { "OrderItems", "Состав заказов" },
-            { "Cart", "Корзина" }
+            { "Orders", "📜 Управление заказами" },
+            { "Motorcycles", "🏍️ Каталог мотоциклов" },
+            { "Parts", "🔧 Каталог запчастей" },
+            { "Users", "👤 База пользователей" }
         };
 
         public admin()
@@ -38,231 +34,235 @@ namespace cured
             CreateAdminInterface();
         }
 
-        #endregion
-
-        #region Интерфейс
-
         private void CreateAdminInterface()
         {
-            this.Text = "Управление базой данных";
+            this.Text = "Панель администратора";
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Size = new Size(1100, 700);
+            this.Size = new Size(1300, 750);
             this.BackColor = Color.White;
 
             lblTitle = new Label
             {
-                Text = "ПАНЕЛЬ АДМИНИСТРАТОРА",
+                Text = "ПАНЕЛЬ УПРАВЛЕНИЯ МАГАЗИНОМ",
                 Location = new Point(20, 20),
                 AutoSize = true,
                 ForeColor = Color.DarkRed,
-                Font = new Font("Segoe UI", 16, FontStyle.Bold)
+                Font = new Font("Segoe UI", 18, FontStyle.Bold)
             };
 
             cbTables = new ComboBox
             {
-                Location = new Point(20, 65),
-                Width = 250,
+                Location = new Point(20, 70),
+                Width = 350,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10)
+                Font = new Font("Segoe UI", 11),
+                FlatStyle = FlatStyle.Flat
             };
 
-            // 1. ПОДГОТОВКА ДАННЫХ
             var displayList = tableMapping.ToList();
-            displayList.Insert(0, new KeyValuePair<string, string>("", "Выберите таблицу..."));
-
-            // 2. ПРИВЯЗКА ДАННЫХ
+            displayList.Insert(0, new KeyValuePair<string, string>("", "--- ВЫБЕРИТЕ РАЗДЕЛ ---"));
             cbTables.DataSource = displayList;
             cbTables.DisplayMember = "Value";
             cbTables.ValueMember = "Key";
-
-            // 3. БЕЗОПАСНАЯ УСТАНОВКА ИНДЕКСА (Исправляет ArgumentOutOfRangeException)
-            if (cbTables.Items.Count > 0)
-            {
-                cbTables.SelectedIndex = 0;
-            }
-
-            // 4. ПОДПИСКА НА СОБЫТИЕ (Только после инициализации данных)
-            cbTables.SelectedIndexChanged += cbTables_SelectedIndexChanged;
+            cbTables.SelectedIndexChanged += (s, e) => {
+                string table = cbTables.SelectedValue?.ToString();
+                if (!string.IsNullOrEmpty(table)) LoadTable(table);
+            };
 
             dgvAdmin = new DataGridView
             {
-                Location = new Point(20, 110),
-                Size = new Size(1040, 460),
-                BorderStyle = BorderStyle.None
+                Location = new Point(20, 115),
+                Size = new Size(1240, 500),
+                BorderStyle = BorderStyle.None,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                BackgroundColor = Color.WhiteSmoke
             };
             SetupGridStyle(dgvAdmin);
 
-            btnSave = CreateStyledButton("СОХРАНИТЬ ИЗМЕНЕНИЯ", new Point(20, 590), Color.ForestGreen);
+            btnSave = CreateStyledButton("💾 СОХРАНИТЬ ИЗМЕНЕНИЯ", new Point(20, 640), Color.ForestGreen);
             btnSave.Click += btnSave_Click;
 
-            btnDelete = CreateStyledButton("УДАЛИТЬ СТРОКУ", new Point(220, 590), Color.DarkRed);
+            btnDelete = CreateStyledButton("🗑️ УДАЛИТЬ ВЫБРАННОЕ", new Point(230, 640), Color.DarkRed);
             btnDelete.Click += btnDelete_Click;
 
-            btnBack = CreateStyledButton("ВЕРНУТЬСЯ", new Point(880, 590), Color.Gray);
+            btnAddNewProduct = CreateStyledButton("➕ ДОБАВИТЬ НОВЫЙ ТОВАР", new Point(440, 640), Color.DodgerBlue);
+            btnAddNewProduct.Click += (s, e) => {
+                using (FormAddProduct f = new FormAddProduct())
+                {
+                    if (f.ShowDialog() == DialogResult.OK)
+                    {
+                        string table = cbTables.SelectedValue?.ToString();
+                        if (table == "Motorcycles" || table == "Parts") LoadTable(table);
+                    }
+                }
+            };
+
+            btnBack = CreateStyledButton("↩️ ВЕРНУТЬСЯ НАЗАД", new Point(1080, 640), Color.Gray);
             btnBack.Click += (s, e) => this.Close();
 
-            this.Controls.Add(lblTitle);
-            this.Controls.Add(cbTables);
-            this.Controls.Add(dgvAdmin);
-            this.Controls.Add(btnSave);
-            this.Controls.Add(btnDelete);
-            this.Controls.Add(btnBack);
-        }
-
-        private Button CreateStyledButton(string text, Point location, Color backColor)
-        {
-            return new Button
-            {
-                Text = text,
-                Location = location,
-                Size = new Size(190, 45),
-                BackColor = backColor,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-        }
-
-        private void SetupGridStyle(DataGridView dgv)
-        {
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.BackgroundColor = Color.White;
-            dgv.RowHeadersVisible = false;
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.DarkRed;
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersHeight = 40;
-            dgv.DataError += (s, e) => { e.ThrowException = false; };
-        }
-
-        #endregion
-
-        #region Работа с данными
-
-        private void cbTables_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            string selectedTable = cbTables.SelectedValue?.ToString();
-            if (!string.IsNullOrEmpty(selectedTable))
-            {
-                LoadTable(selectedTable);
-            }
-            else
-            {
-                dgvAdmin.DataSource = null;
-            }
+            this.Controls.AddRange(new Control[] { lblTitle, cbTables, dgvAdmin, btnSave, btnDelete, btnAddNewProduct, btnBack });
         }
 
         private void LoadTable(string tableName)
         {
             try
             {
-                // Используем SELECT *, чтобы избежать ошибок с именами столбцов
                 string query = $"SELECT * FROM [{tableName}]";
-                SqlConnection con = db.getConnection();
 
-                adapter = new SqlDataAdapter(query, con);
-                SqlCommandBuilder builder = new SqlCommandBuilder(adapter);
+                if (tableName == "Orders")
+                {
+                    query = @"SELECT o.OrderID, u.FullName as [ФИО Клиента], o.Phone as [Контактный Телефон], 
+                              (SELECT STUFF((SELECT ', ' + ISNULL(m.Brand + ' ' + m.Model, p.PartName) + ' (' + CAST(oi.Quantity AS VARCHAR) + ' шт.)'
+                               FROM OrderItems oi 
+                               LEFT JOIN Motorcycles m ON oi.MotorcycleID = m.MotorcycleID 
+                               LEFT JOIN Parts p ON oi.PartID = p.PartID
+                               WHERE oi.OrderID = o.OrderID FOR XML PATH('')), 1, 2, '')) as [Состав заказа],
+                              CAST(o.TotalAmount AS DECIMAL(18,0)) as [Итоговая Сумма], 
+                              o.OrderDate as [Дата оформления], o.Status 
+                              FROM Orders o 
+                              LEFT JOIN Users u ON o.UserID = u.UserID";
+                }
 
+                adapter = new SqlDataAdapter(query, db.getConnection());
+                new SqlCommandBuilder(adapter);
                 ds = new DataSet();
                 adapter.Fill(ds, tableName);
+
+                dgvAdmin.Columns.Clear();
                 dgvAdmin.DataSource = ds.Tables[tableName];
 
+                if (tableName == "Orders")
+                {
+                    foreach (DataGridViewColumn col in dgvAdmin.Columns)
+                    {
+                        if (col.Name == "Состав заказа")
+                        {
+                            col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                            col.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+                        }
+                        else
+                        {
+                            col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                        }
+                        if (col.Name != "Status") col.ReadOnly = true;
+                    }
+                    ReplaceStatusWithCombo();
+                    dgvAdmin.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+                }
+                else
+                {
+                    dgvAdmin.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                }
                 TranslateColumns();
             }
-            catch (Exception ex)
+            catch (Exception ex) { MessageBox.Show("Ошибка при чтении данных: " + ex.Message); }
+        }
+
+        private void ReplaceStatusWithCombo()
+        {
+            DataGridViewComboBoxColumn combo = new DataGridViewComboBoxColumn
             {
-                MessageBox.Show("Ошибка SQL: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+                HeaderText = "Статус исполнения",
+                DataPropertyName = "Status",
+                FlatStyle = FlatStyle.Flat
+            };
+            combo.Items.AddRange("Новый", "В обработке", "Завершен", "Отменен");
+            int idx = dgvAdmin.Columns["Status"].Index;
+            dgvAdmin.Columns.RemoveAt(idx);
+            dgvAdmin.Columns.Insert(idx, combo);
         }
 
         private void TranslateColumns()
         {
-            // Словарь переводов для ВСЕХ возможных колонок из ваших таблиц
-            Dictionary<string, string> translations = new Dictionary<string, string>
-            {
-                { "UserID", "ID" },
-                { "Login", "Логин" },
-                { "Password", "Пароль" },
-                { "FullName", "ФИО" },
-                { "Phone", "Телефон" },
-                { "Role", "Роль" },
-                { "MotorcycleID", "ID Мото" },
-                { "PartID", "ID Детали" },
-                { "Brand", "Марка" },
-                { "Model", "Модель" },
-                { "ForModels", "Для моделей" }, // Исправлено для таблицы Parts
-                { "Year", "Год" },
-                { "Price", "Цена (₽)" },
-                { "Description", "Описание" },
-                { "Quantity", "Кол-во" },
-                { "PartName", "Название детали" },
-                { "OrderID", "№ Заказа" },
-                { "OrderDate", "Дата заказа" },
-                { "TotalAmount", "Сумма (₽)" },
-                { "Status", "Статус" },
-                { "ImageURL", "Путь к фото" }
+            Dictionary<string, string> dict = new Dictionary<string, string> {
+                { "OrderID", "№ Заказа" }, { "MotorcycleID", "ID Мото" }, { "PartID", "ID Детали" },
+                { "Brand", "Марка / Бренд" }, { "Model", "Модель" }, { "Price", "Цена (₽)" }, { "Quantity", "Остаток на складе" }, 
+                { "FullName", "Полное имя" },{ "UserID", "ID пользователя" }, { "Login", "Логин" },{ "Role", "Роль" },
+                { "Password", "Пароль" }, { "Phone", "Телефон" }, { "PartName", "Название детали" },
+                { "Description", "Описание товара" }, { "ImageURL", "Путь к картинке" }, { "Year", "Год выпуска" }
             };
-
             foreach (DataGridViewColumn col in dgvAdmin.Columns)
-            {
-                if (translations.ContainsKey(col.Name))
-                    col.HeaderText = translations[col.Name];
-            }
+                if (dict.ContainsKey(col.Name)) col.HeaderText = dict[col.Name];
         }
-
-        #endregion
-
-        #region Обработка событий
 
         private void btnSave_Click(object sender, EventArgs e)
         {
             try
             {
-                string selectedTable = cbTables.SelectedValue?.ToString();
-                if (adapter != null && ds != null && !string.IsNullOrEmpty(selectedTable))
-                {
-                    dgvAdmin.EndEdit();
-                    adapter.Update(ds, selectedTable);
-                    MessageBox.Show("Изменения сохранены!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                dgvAdmin.EndEdit();
+                adapter.Update(ds, cbTables.SelectedValue.ToString());
+                MessageBox.Show("Все изменения успешно применены в базе данных!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Ошибка сохранения: " + ex.Message);
-            }
+            catch (Exception ex) { MessageBox.Show("Ошибка сохранения изменений: " + ex.Message); }
         }
 
         private void btnDelete_Click(object sender, EventArgs e)
         {
-            if (dgvAdmin.SelectedRows.Count > 0)
+            if (dgvAdmin.CurrentRow == null || dgvAdmin.CurrentRow.IsNewRow) return;
+            if (MessageBox.Show("Вы уверены, что хотите безвозвратно удалить эту запись?", "Подтверждение удаления", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
             {
-                if (MessageBox.Show("Удалить выбранную запись?", "Подтверждение", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                try
                 {
-                    foreach (DataGridViewRow row in dgvAdmin.SelectedRows)
+                    string table = cbTables.SelectedValue.ToString();
+                    if (table == "Orders")
                     {
-                        if (!row.IsNewRow) dgvAdmin.Rows.Remove(row);
+                        int id = Convert.ToInt32(dgvAdmin.CurrentRow.Cells["OrderID"].Value);
+                        db.ExecuteNonQuery($"DELETE FROM OrderItems WHERE OrderID = {id}");
+                        db.ExecuteNonQuery($"DELETE FROM Orders WHERE OrderID = {id}");
+                        LoadTable("Orders");
                     }
-                    btnSave_Click(null, null); // Сразу сохраняем в БД
+                    else if (table == "Users")
+                    {
+                        int userId = Convert.ToInt32(dgvAdmin.CurrentRow.Cells["UserID"].Value);
+
+                        // 1. Очищаем корзину пользователя
+                        db.ExecuteNonQuery($"DELETE FROM Cart WHERE UserID = {userId}");
+
+                        // 2. Если нужно удалять и заказы пользователя (опционально):
+                        // Сначала удаляем позиции всех его заказов
+                        db.ExecuteNonQuery($"DELETE FROM OrderItems WHERE OrderID IN (SELECT OrderID FROM Orders WHERE UserID = {userId})");
+                        // Затем сами заказы
+                        db.ExecuteNonQuery($"DELETE FROM Orders WHERE UserID = {userId}");
+
+                        // 3. Теперь удаляем самого пользователя
+                        db.ExecuteNonQuery($"DELETE FROM Users WHERE UserID = {userId}");
+
+                        LoadTable("Users"); // Перезагружаем таблицу
+                    }
+                    else
+                    {
+                        // Для остальных таблиц оставляем как было
+                        dgvAdmin.Rows.Remove(dgvAdmin.CurrentRow);
+                        btnSave_Click(null, null);
+                    }
+
                 }
+                catch (Exception ex) { MessageBox.Show("Удаление невозможно: запись используется в других таблицах."); }
             }
         }
 
-        private void dgvAdmin_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        private void SetupGridStyle(DataGridView dgv)
         {
-            if (dgvAdmin.Columns[e.ColumnIndex].ValueType == typeof(int) || dgvAdmin.Columns[e.ColumnIndex].ValueType == typeof(decimal))
-            {
-                if (!string.IsNullOrEmpty(e.FormattedValue.ToString()) && !decimal.TryParse(e.FormattedValue.ToString(), out _))
-                {
-                    MessageBox.Show("Здесь должно быть число!");
-                    e.Cancel = true;
-                }
-            }
+            dgv.EnableHeadersVisualStyles = false;
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.DarkRed;
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+            dgv.ColumnHeadersHeight = 45;
+            dgv.RowTemplate.Height = 30;
         }
+
+        private Button CreateStyledButton(string text, Point location, Color backColor) => new Button
+        {
+            Text = text,
+            Location = location,
+            Size = new Size(200, 50),
+            BackColor = backColor,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
 
         private void admin_FormClosed(object sender, FormClosedEventArgs e) => new main().Show();
-
-        #endregion
     }
 }

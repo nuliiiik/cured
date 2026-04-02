@@ -103,9 +103,8 @@ namespace cured
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     // Переход на главную форму
-                    main form_main = new main();
-                    form_main.Show();
-                    this.Hide();
+                    if (user.role == "admin") { new admin().Show(); this.Hide(); }
+                    else { new main().Show(); this.Hide(); }
                 }
                 else
                 {

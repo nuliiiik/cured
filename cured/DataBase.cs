@@ -25,7 +25,7 @@ namespace cured
             SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
 
             // Динамически подставляем имя ПК и экземпляр сервера \CURSED
-            builder.DataSource = $@"BGPK-W01380890\SQLEXPRESS";
+            builder.DataSource = $@"nuliikk";
 
             // Название целевой базы данных
             builder.InitialCatalog = "CURSED";

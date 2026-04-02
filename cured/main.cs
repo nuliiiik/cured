@@ -338,7 +338,7 @@ namespace cured
         {
             if (!acc_checked.acc_check) { new login().Show(); this.Hide(); }
             else if (user.role == "admin") { new admin().Show(); this.Hide(); }
-            else { new profile().Show(); this.Hide(); }
+            else { new main().Show(); this.Hide(); }
         }
 
         private void pictureBox1_Click(object sender, EventArgs e) => Label5_Click(sender, e);
@@ -346,5 +346,6 @@ namespace cured
         private void main_FormClosed(object sender, FormClosedEventArgs e) => Application.Exit();
 
         #endregion
+
     }
 }
